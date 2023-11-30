@@ -1,0 +1,278 @@
+require 'active_support/core_ext/string/filters'
+require 'dotenv'
+
+require_relative '../../core/csv/adapter'
+
+class Script < Csv::Adapter
+  def cleanup
+    super
+
+    execute <<-SQL.squish
+      DROP TABLE IF EXISTS z_organizations
+    SQL
+
+    execute <<-SQL.squish
+      DROP TABLE IF EXISTS z_people
+    SQL
+
+    execute <<-SQL.squish
+      DROP TABLE IF EXISTS z_places
+    SQL
+
+    execute <<-SQL.squish
+      DROP TABLE IF EXISTS z_relationships
+    SQL
+  end
+
+  def load
+    super
+
+    export 'organizations.csv', <<-SQL.squish
+      SELECT project_model_id, 
+             uuid, 
+             name AS name, 
+             NULL as description
+        FROM z_organizations
+       ORDER BY name
+    SQL
+
+    export 'people.csv', <<-SQL.squish
+      SELECT project_model_id, 
+             uuid, 
+             last_name, 
+             first_name, 
+             NULL AS middle_name, 
+             NULL AS biography
+        FROM z_people
+       ORDER BY last_name, first_name
+    SQL
+
+    export 'places.csv', <<-SQL.squish
+      SELECT project_model_id, 
+             uuid, 
+             name, 
+             latitude, 
+             longitude
+        FROM z_places
+       ORDER BY name
+    SQL
+
+    export 'relationships.csv', <<-SQL.squish
+      SELECT project_model_relationship_id, 
+             primary_record_uuid, 
+             primary_record_type, 
+             related_record_uuid, 
+             related_record_type
+        FROM z_relationships
+    SQL
+  end
+
+  def setup
+    super
+
+    execute <<-SQL.squish
+      CREATE EXTENSION IF NOT EXISTS pgcrypto
+    SQL
+
+    execute <<-SQL.squish
+      CREATE TABLE z_organizations (
+        id SERIAL,
+        uuid UUID DEFAULT gen_random_uuid(),
+        project_model_id INTEGER,
+        name VARCHAR,
+        description VARCHAR
+      )
+    SQL
+
+    execute <<-SQL.squish
+      CREATE TABLE z_people (
+        id SERIAL,
+        uuid UUID DEFAULT gen_random_uuid(),
+        project_model_id INTEGER,
+        name VARCHAR,
+        last_name VARCHAR,
+        first_name VARCHAR
+      )
+    SQL
+
+    execute <<-SQL.squish
+      CREATE TABLE z_places (
+        id SERIAL,
+        uuid UUID DEFAULT gen_random_uuid(),
+        project_model_id INTEGER,
+        name VARCHAR,
+        latitude DECIMAL,
+        longitude DECIMAL
+      )
+    SQL
+
+    execute <<-SQL
+      CREATE TABLE z_relationships (
+        id SERIAL,
+        project_model_relationship_id INTEGER,
+        primary_record_uuid UUID,
+        primary_record_type VARCHAR,
+        related_record_uuid UUID,
+        related_record_type VARCHAR
+      )
+    SQL
+  end
+
+  def transform
+    super
+
+    execute <<-SQL.squish
+      INSERT INTO z_organizations ( project_model_id, name )
+      SELECT #{env['PROJECT_MODEL_ID_ORGANIZATIONS'].to_i}, name
+        FROM #{table_name}
+    SQL
+
+    execute <<-SQL.squish
+      WITH 
+ 
+      all_people AS (
+
+      SELECT editor as name, 'editor' AS type
+        FROM #{table_name}
+       WHERE editor IS NOT NULL
+         AND TRIM(editor) != ''
+       UNION
+      SELECT publisher as name, 'publisher' AS type
+        FROM #{table_name}
+       WHERE publisher IS NOT NULL
+         AND TRIM(publisher) != ''
+       UNION
+      SELECT contributors as name, 'contributors' AS type
+        FROM #{table_name}
+       WHERE contributors IS NOT NULL
+         AND TRIM(contributors) != ''
+          
+      )
+
+      INSERT INTO z_people ( project_model_id, name, last_name, first_name )
+      SELECT #{env['PROJECT_MODEL_ID_PEOPLE'].to_i},
+             name,
+             regexp_replace(name, '^.*\\s+(\\S+)$', '\\1') AS last_name, 
+             regexp_replace(name, '\\s+\\S+$', '') AS first_name
+        FROM all_people
+       GROUP BY all_people.name
+      RETURNING id, name, uuid
+    SQL
+
+    execute <<-SQL.squish
+      INSERT INTO z_places ( project_model_id, name, latitude, longitude )
+      SELECT #{env['PROJECT_MODEL_ID_PLACES'].to_i}, name, latitude, longitude
+        FROM #{table_name}
+       WHERE ( address IS NOT NULL AND TRIM(address) != '' )
+          OR ( latitude IS NOT NULL AND longitude IS NOT NULL )
+    SQL
+
+    execute <<-SQL
+      INSERT INTO z_relationships ( 
+        project_model_relationship_id, 
+        primary_record_uuid, 
+        primary_record_type, 
+        related_record_uuid, 
+        related_record_type 
+      )
+      SELECT #{env['PROJECT_MODEL_RELATIONSHIP_ID_EDITOR'].to_i}, 
+             z_organizations.uuid, 
+             'CoreDataConnector::Organization', 
+             z_people.uuid, 
+             'CoreDataConnector::Person'
+        FROM #{table_name} z_temp
+        JOIN z_organizations ON z_organizations.name = z_temp.name
+        JOIN z_people ON z_people.name = z_temp.editor
+       UNION
+      SELECT #{env['PROJECT_MODEL_RELATIONSHIP_ID_PUBLISHER'].to_i}, 
+             z_organizations.uuid, 
+             'CoreDataConnector::Organization', 
+             z_people.uuid, 
+             'CoreDataConnector::Person'
+        FROM #{table_name} z_temp
+        JOIN z_organizations ON z_organizations.name = z_temp.name
+        JOIN z_people ON z_people.name = z_temp.publisher
+       UNION
+      SELECT #{env['PROJECT_MODEL_RELATIONSHIP_ID_CONTRIBUTOR'].to_i}, 
+             z_organizations.uuid, 
+             'CoreDataConnector::Organization', 
+             z_people.uuid, 
+             'CoreDataConnector::Person'
+        FROM #{table_name} z_temp
+        JOIN z_organizations ON z_organizations.name = z_temp.name
+        JOIN z_people ON z_people.name = z_temp.contributors
+       UNION
+      SELECT #{env['PROJECT_MODEL_RELATIONSHIP_ID_LOCATION'].to_i}, 
+             z_organizations.uuid, 
+             'CoreDataConnector::Organization', 
+             z_places.uuid, 
+             'CoreDataConnector::Place'
+        FROM #{table_name} z_temp
+        JOIN z_organizations ON z_organizations.name = z_temp.name
+        JOIN z_places ON z_places.name = z_temp.name
+    SQL
+  end
+
+  protected
+
+  def column_names
+    [{
+       name: 'name',
+       type: 'VARCHAR'
+    }, {
+       name: 'address',
+       type: 'VARCHAR'
+     }, {
+       name: 'latitude',
+       type: 'DECIMAL'
+     }, {
+       name: 'longitude',
+       type: 'DECIMAL'
+     }, {
+       name: 'type',
+       type: 'VARCHAR'
+     }, {
+       name: 'editor',
+       type: 'VARCHAR'
+     }, {
+       name: 'publisher',
+       type: 'VARCHAR'
+     }, {
+       name: 'contributors',
+       type: 'VARCHAR'
+     }, {
+       name: 'printer',
+       type: 'VARCHAR'
+     }, {
+       name: 'dates',
+       type: 'VARCHAR'
+     }, {
+       name: 'archives',
+       type: 'TEXT'
+     }, {
+       name: 'notes',
+       type: 'TEXT'
+     }, {
+       name: 'oclc',
+       type: 'VARCHAR'
+     }, {
+       name: 'libraries',
+       type: 'VARCHAR'
+     }]
+  end
+end
+
+env = Dotenv.parse './scripts/gbof/.env.development'
+
+script = Script.new(
+  database: ARGV[0],
+  filepath: ARGV[1],
+  output: ARGV[2],
+  env: env
+)
+
+script.setup
+script.extract
+script.transform
+script.load
+script.cleanup
