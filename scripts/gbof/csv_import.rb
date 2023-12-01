@@ -1,9 +1,11 @@
 require 'active_support/core_ext/string/filters'
 require 'dotenv'
+require 'optparse'
 
 require_relative '../../core/csv/adapter'
+require_relative '../../core/archive'
 
-class Script < Csv::Adapter
+class CsvImport < Csv::Adapter
   def cleanup
     super
 
@@ -31,7 +33,12 @@ class Script < Csv::Adapter
       SELECT project_model_id, 
              uuid, 
              name AS name, 
-             NULL as description
+             NULL AS description,
+             #{user_defined_column('ORGANIZATION_DATES_UUID')},
+             #{user_defined_column('ORGANIZATION_ARCHIVES_UUID')},
+             #{user_defined_column('ORGANIZATION_NOTES_UUID')},
+             #{user_defined_column('ORGANIZATION_OCLCNO_UUID')},
+             #{user_defined_column('ORGANIZATION_LIBRARIES_UUID')}
         FROM z_organizations
        ORDER BY name
     SQL
@@ -52,7 +59,8 @@ class Script < Csv::Adapter
              uuid, 
              name, 
              latitude, 
-             longitude
+             longitude,
+             #{user_defined_column('PLACE_ADDRESS_UUID')}
         FROM z_places
        ORDER BY name
     SQL
@@ -80,7 +88,12 @@ class Script < Csv::Adapter
         uuid UUID DEFAULT gen_random_uuid(),
         project_model_id INTEGER,
         name VARCHAR,
-        description VARCHAR
+        description VARCHAR,
+        #{user_defined_column('ORGANIZATION_DATES_UUID')} VARCHAR,
+        #{user_defined_column('ORGANIZATION_ARCHIVES_UUID')} VARCHAR,
+        #{user_defined_column('ORGANIZATION_NOTES_UUID')} VARCHAR,
+        #{user_defined_column('ORGANIZATION_OCLCNO_UUID')} VARCHAR,
+        #{user_defined_column('ORGANIZATION_LIBRARIES_UUID')} VARCHAR
       )
     SQL
 
@@ -102,7 +115,8 @@ class Script < Csv::Adapter
         project_model_id INTEGER,
         name VARCHAR,
         latitude DECIMAL,
-        longitude DECIMAL
+        longitude DECIMAL,
+        #{user_defined_column('PLACE_ADDRESS_UUID')} VARCHAR
       )
     SQL
 
@@ -122,8 +136,16 @@ class Script < Csv::Adapter
     super
 
     execute <<-SQL.squish
-      INSERT INTO z_organizations ( project_model_id, name )
-      SELECT #{env['PROJECT_MODEL_ID_ORGANIZATIONS'].to_i}, name
+      INSERT INTO z_organizations ( 
+        project_model_id, 
+        name, 
+        #{user_defined_column('ORGANIZATION_DATES_UUID')},
+        #{user_defined_column('ORGANIZATION_ARCHIVES_UUID')},
+        #{user_defined_column('ORGANIZATION_NOTES_UUID')},
+        #{user_defined_column('ORGANIZATION_OCLCNO_UUID')},
+        #{user_defined_column('ORGANIZATION_LIBRARIES_UUID')} 
+      )
+      SELECT #{env['PROJECT_MODEL_ID_ORGANIZATIONS'].to_i}, name, dates, archives, notes, oclc, libraries
         FROM #{table_name}
     SQL
 
@@ -160,8 +182,8 @@ class Script < Csv::Adapter
     SQL
 
     execute <<-SQL.squish
-      INSERT INTO z_places ( project_model_id, name, latitude, longitude )
-      SELECT #{env['PROJECT_MODEL_ID_PLACES'].to_i}, name, latitude, longitude
+      INSERT INTO z_places ( project_model_id, name, latitude, longitude, #{user_defined_column('PLACE_ADDRESS_UUID')} )
+      SELECT #{env['PROJECT_MODEL_ID_PLACES'].to_i}, name, latitude, longitude, address
         FROM #{table_name}
        WHERE ( address IS NOT NULL AND TRIM(address) != '' )
           OR ( latitude IS NOT NULL AND longitude IS NOT NULL )
@@ -262,17 +284,40 @@ class Script < Csv::Adapter
   end
 end
 
+# Parse environment variables
 env = Dotenv.parse './scripts/gbof/.env.development'
 
-script = Script.new(
-  database: ARGV[0],
-  filepath: ARGV[1],
-  output: ARGV[2],
+# Parse input options
+options = {}
+
+OptionParser.new do |opts|
+  opts.on '-d DATABASE', '--database DATABASE', 'Database name'
+  opts.on '-u USER', '--user USER', 'Database username'
+  opts.on '-f FILE', '--file FILE', 'Source filepath'
+  opts.on '-o OUTPUT', '--output OUTPUT', 'Output directory'
+end.parse!(into: options)
+
+# Run the importer
+import = CsvImport.new(
+  database: options[:database],
+  user: options[:user],
+  filepath: options[:file],
+  output: options[:output],
   env: env
 )
 
-script.setup
-script.extract
-script.transform
-script.load
-script.cleanup
+import.setup
+import.extract
+import.transform
+import.load
+import.cleanup
+
+filepaths = [
+  "#{options[:output]}/organizations.csv",
+  "#{options[:output]}/people.csv",
+  "#{options[:output]}/places.csv",
+  "#{options[:output]}/relationships.csv"
+]
+
+archive = Archive.new
+archive.create_archive(filepaths, options[:output])

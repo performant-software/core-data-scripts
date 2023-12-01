@@ -5,8 +5,8 @@ module Csv
   class Adapter
     attr_reader :connection, :filepath, :output_path, :env
 
-    def initialize(database:, filepath:, output:, env:)
-      @connection = PG.connect(dbname: database, user: 'postgres')
+    def initialize(database:, user:, filepath:, output:, env:)
+      @connection = PG.connect(dbname: database, user: user)
       @filepath = filepath
       @output_path = output
       @env = env
@@ -75,6 +75,10 @@ module Csv
 
     def table_name
       'z_temp'
+    end
+
+    def user_defined_column(key)
+      "udf_#{env[key].gsub('-', '_')}"
     end
   end
 end
