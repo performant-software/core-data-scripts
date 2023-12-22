@@ -1,74 +1,70 @@
 require 'active_support/core_ext/string/filters'
+require 'csv'
 require 'dotenv'
 require 'optparse'
+require 'securerandom'
 
-require_relative '../../core/csv/adapter'
-require_relative '../../core/archive'
+class CsvTransform
+  def initialize(input:, output:)
+    @input_path = input
+    @output_path = output
 
-class CsvImport < Csv::Adapter
-  def cleanup
-    super
-
-    execute <<-SQL.squish
-      DROP TABLE IF EXISTS z_archives
-    SQL
-
-    execute <<-SQL.squish
-      DROP TABLE IF EXISTS z_editions
-    SQL
-
-    execute <<-SQL.squish
-      DROP TABLE IF EXISTS z_people
-    SQL
-
-    execute <<-SQL.squish
-      DROP TABLE IF EXISTS z_places
-    SQL
-
-    execute <<-SQL.squish
-      DROP TABLE IF EXISTS z_publishers
-    SQL
-
-    execute <<-SQL.squish
-      DROP TABLE IF EXISTS z_works
-    SQL
-
-    execute <<-SQL.squish
-      DROP TABLE IF EXISTS z_relationships
-    SQL
+    @filenames = [
+      'archives',
+      'editions_archives',
+      'editions_editions',
+      'editions_people',
+      'editions_publishers',
+      'editions',
+      'people',
+      'places',
+      'publishers_places',
+      'publishers',
+      'works'
+    ]
   end
 
-  # Parse environment variables
-  env = Dotenv.parse './scripts/gbof/.env.development'
+  def copy_to_output_dir
+    @filenames.each do |filename|
+      FileUtils.cp("#{@input_path}/#{filename}.csv", @output_path)
+    end
+  end
 
-  # Parse input options
-  options = {}
+  def add_uuids
+    @filenames.each do |filename, idx|
+      CSV.open("#{@output_path}/#{filename}.csv", 'wb', write_headers: true) do |csv_out|
+        table = CSV.read("#{@input_path}/#{filename}.csv", headers: true)
 
-  OptionParser.new do |opts|
-    opts.on '-d DATABASE', '--database DATABASE', 'Database name'
-    opts.on '-u USER', '--user USER', 'Database username'
-    opts.on '-f FILE', '--file FILE', 'Source filepath'
-    opts.on '-o OUTPUT', '--output OUTPUT', 'Output directory'
-  end.parse!(into: options)
+        table.each do |row|
+          row['uuid'] = SecureRandom.uuid
+        end
 
-  # Run the importer
-  import = CsvImport.new(
-    database: options[:database],
-    user: options[:user],
-    filepath: options[:file],
-    output: options[:output],
-    env: env
-  )
+        csv_out << table[0].to_h.keys
+        csv_out << table
+      end
 
-  import.cleanup
+    end
+  end
 
-  filepaths = [
-    "#{options[:output]}/organizations.csv",
-    "#{options[:output]}/people.csv",
-    "#{options[:output]}/places.csv",
-    "#{options[:output]}/relationships.csv"
-  ]
-
-  archive = Archive.new
-  archive.create_archive(filepaths, options[:output])
+  env = Dotenv.parse './scripts/rumpf/.env.development'
 end
+
+# Parse input options
+options = {}
+
+OptionParser.new do |opts|
+  opts.on '-i INPUT', '--input INPUT', 'Input directory'
+  opts.on '-o OUTPUT', '--output OUTPUT', 'Output directory'
+end.parse!(into: options)
+
+unless options[:input] && options[:output]
+  puts 'Input and output directory paths are required in arguments.'
+  exit 1
+end
+
+transform = CsvTransform.new(
+  input: options[:input],
+  output: options[:output]
+)
+
+transform.add_uuids
