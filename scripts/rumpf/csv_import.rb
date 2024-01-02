@@ -33,10 +33,11 @@ class CsvTransform
       CSV.open("#{@output_path}/#{filename}.csv", 'w') do |csv_out|
         table = CSV.read("#{@input_path}/#{filename}.csv", headers: true)
 
-        csv_out << [*table[0].to_h.keys, 'uuid']
+        csv_out << [*table[0].to_h.keys, 'uuid', 'project_model_id']
 
         table.each do |row|
           row['uuid'] = SecureRandom.uuid
+          row['project_model_id'] = @env["PROJECT_MODEL_ID_#{filename.upcase}"].to_i
           csv_out << row
         end
       end
