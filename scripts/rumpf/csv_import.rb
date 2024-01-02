@@ -14,6 +14,7 @@ class CsvTransform
 
     @filenames = [
       'archives',
+      'archives_places',
       'editions_archives',
       'editions_editions',
       'editions_people',
@@ -51,15 +52,13 @@ class CsvTransform
   end
 
   def transform_relationship(relation_obj)
-    order = [
+    [
       'project_model_relationship_id',
       'primary_record_uuid',
       'primary_record_type',
       'related_record_uuid',
       'related_record_type'
-    ]
-
-    order.map { |field| relation_obj[field] }
+    ].map { |field| relation_obj[field] }
   end
 
   def parse_editions_archives
@@ -156,6 +155,52 @@ class CsvTransform
       end
     end
   end
+
+  def parse_publishers_places
+    publishers = CSV.read("#{@output_path}/publishers.csv", headers: true)
+    places = CSV.read("#{@output_path}/places.csv", headers: true)
+    relations = CSV.read("#{@output_path}/publishers_places.csv", headers: true)
+
+    CSV.open("#{@output_path}/relationships.csv", 'a') do |csv_out|
+      relations.each do |relation|
+        matching_primary = publishers.find { |ed| ed['id'] == relation['publishers_id']}
+        matching_related = places.find { |ed| ed['id'] == relation['places_id']}
+
+        if matching_related && matching_primary
+          new_relation = {}
+          new_relation['project_model_relationship_id'] = @env['PROJECT_MODEL_RELATIONSHIP_ID_EDITIONS_PUBLISHERS'].to_i
+          new_relation['primary_record_uuid'] = matching_primary['uuid']
+          new_relation['primary_record_type'] = 'CoreDataConnector:Organization'
+          new_relation['related_record_uuid'] = matching_related['uuid']
+          new_relation['related_record_type'] = 'CoreDataConnector:Place'
+          csv_out << transform_relationship(new_relation)
+        end
+      end
+    end
+  end
+
+  def parse_archives_places
+    archives = CSV.read("#{@output_path}/archives.csv", headers: true)
+    places = CSV.read("#{@output_path}/places.csv", headers: true)
+    relations = CSV.read("#{@output_path}/archives_places.csv", headers: true)
+
+    CSV.open("#{@output_path}/relationships.csv", 'a') do |csv_out|
+      relations.each do |relation|
+        matching_primary = archives.find { |ed| ed['id'] == relation['archives_id']}
+        matching_related = places.find { |ed| ed['id'] == relation['places_id']}
+
+        if matching_related && matching_primary
+          new_relation = {}
+          new_relation['project_model_relationship_id'] = @env['PROJECT_MODEL_RELATIONSHIP_ID_ARCHIVES_PLACES'].to_i
+          new_relation['primary_record_uuid'] = matching_primary['uuid']
+          new_relation['primary_record_type'] = 'CoreDataConnector:Organization'
+          new_relation['related_record_uuid'] = matching_related['uuid']
+          new_relation['related_record_type'] = 'CoreDataConnector:Place'
+          csv_out << transform_relationship(new_relation)
+        end
+      end
+    end
+  end
 end
 
 env = Dotenv.parse './scripts/rumpf/.env.development'
@@ -185,3 +230,5 @@ transform.parse_editions_archives
 transform.parse_editions_editions
 transform.parse_editions_people
 transform.parse_editions_publishers
+transform.parse_publishers_places
+transform.parse_archives_places
