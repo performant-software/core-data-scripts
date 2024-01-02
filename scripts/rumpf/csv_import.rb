@@ -27,12 +27,6 @@ class CsvTransform
     ]
   end
 
-  def copy_to_output_dir
-    @filenames.each do |filename|
-      FileUtils.cp("#{@input_path}/#{filename}.csv", @output_path)
-    end
-  end
-
   def add_uuids
     @filenames.each do |filename|
       CSV.open("#{@output_path}/#{filename}.csv", 'w') do |csv_out|
