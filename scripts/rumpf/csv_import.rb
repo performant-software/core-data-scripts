@@ -201,6 +201,23 @@ class CsvTransform
       end
     end
   end
+
+  # Removes extraneous M2M files from the output dir.
+  def cleanup
+    relation_files = [
+      'archives_places',
+      'editions_archives',
+      'editions_editions',
+      'editions_people',
+      'editions_publishers',
+      'publishers_places'
+    ]
+
+    relation_files.each do |file|
+      file_path = "#{@output_path}/#{file}.csv"
+      File.delete(file_path) if File.exist?(file_path)
+    end
+  end
 end
 
 env = Dotenv.parse './scripts/rumpf/.env.development'
@@ -232,3 +249,4 @@ transform.parse_editions_people
 transform.parse_editions_publishers
 transform.parse_publishers_places
 transform.parse_archives_places
+transform.cleanup
