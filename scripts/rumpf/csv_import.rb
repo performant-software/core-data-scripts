@@ -12,24 +12,27 @@ class CsvTransform
     @output_path = output
     @env = env
 
-    @filenames = [
+    @model_files = [
       'archives',
+      'editions',
+      'people',
+      'places',
+      'publishers',
+      'works'
+    ]
+
+    @relation_files = [
       'archives_places',
       'editions_archives',
       'editions_editions',
       'editions_people',
       'editions_publishers',
-      'editions',
-      'people',
-      'places',
-      'publishers_places',
-      'publishers',
-      'works'
+      'publishers_places'
     ]
   end
 
   def add_uuids
-    @filenames.each do |filename|
+    @model_files.each do |filename|
       CSV.open("#{@output_path}/#{filename}.csv", 'w') do |csv_out|
         table = CSV.read("#{@input_path}/#{filename}.csv", headers: true)
 
@@ -65,7 +68,7 @@ class CsvTransform
   def parse_editions_archives
     primary_records = CSV.read("#{@output_path}/archives.csv", headers: true)
     related_records = CSV.read("#{@output_path}/editions.csv", headers: true)
-    relations = CSV.read("#{@output_path}/editions_archives.csv", headers: true)
+    relations = CSV.read("#{@input_path}/editions_archives.csv", headers: true)
 
     CSV.open("#{@output_path}/relationships.csv", 'a') do |csv_out|
       relations.each do |relation|
@@ -87,7 +90,7 @@ class CsvTransform
 
   def parse_editions_editions
     editions = CSV.read("#{@output_path}/editions.csv", headers: true)
-    relations = CSV.read("#{@output_path}/editions_editions.csv", headers: true)
+    relations = CSV.read("#{@input_path}/editions_editions.csv", headers: true)
 
     CSV.open("#{@output_path}/relationships.csv", 'a') do |csv_out|
       relations.each do |relation|
@@ -114,7 +117,7 @@ class CsvTransform
   def parse_editions_people
     editions = CSV.read("#{@output_path}/editions.csv", headers: true)
     people = CSV.read("#{@output_path}/people.csv", headers: true)
-    relations = CSV.read("#{@output_path}/editions_people.csv", headers: true)
+    relations = CSV.read("#{@input_path}/editions_people.csv", headers: true)
 
     CSV.open("#{@output_path}/relationships.csv", 'a') do |csv_out|
       relations.each do |relation|
@@ -137,7 +140,7 @@ class CsvTransform
   def parse_editions_publishers
     editions = CSV.read("#{@output_path}/editions.csv", headers: true)
     publishers = CSV.read("#{@output_path}/publishers.csv", headers: true)
-    relations = CSV.read("#{@output_path}/editions_publishers.csv", headers: true)
+    relations = CSV.read("#{@input_path}/editions_publishers.csv", headers: true)
 
     CSV.open("#{@output_path}/relationships.csv", 'a') do |csv_out|
       relations.each do |relation|
@@ -160,7 +163,7 @@ class CsvTransform
   def parse_publishers_places
     publishers = CSV.read("#{@output_path}/publishers.csv", headers: true)
     places = CSV.read("#{@output_path}/places.csv", headers: true)
-    relations = CSV.read("#{@output_path}/publishers_places.csv", headers: true)
+    relations = CSV.read("#{@input_path}/publishers_places.csv", headers: true)
 
     CSV.open("#{@output_path}/relationships.csv", 'a') do |csv_out|
       relations.each do |relation|
@@ -183,7 +186,7 @@ class CsvTransform
   def parse_archives_places
     archives = CSV.read("#{@output_path}/archives.csv", headers: true)
     places = CSV.read("#{@output_path}/places.csv", headers: true)
-    relations = CSV.read("#{@output_path}/archives_places.csv", headers: true)
+    relations = CSV.read("#{@input_path}/archives_places.csv", headers: true)
 
     CSV.open("#{@output_path}/relationships.csv", 'a') do |csv_out|
       relations.each do |relation|
@@ -205,16 +208,7 @@ class CsvTransform
 
   # Removes extraneous M2M files from the output dir.
   def cleanup
-    relation_files = [
-      'archives_places',
-      'editions_archives',
-      'editions_editions',
-      'editions_people',
-      'editions_publishers',
-      'publishers_places'
-    ]
-
-    relation_files.each do |file|
+    @relation_files.each do |file|
       file_path = "#{@output_path}/#{file}.csv"
       File.delete(file_path) if File.exist?(file_path)
     end
