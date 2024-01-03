@@ -127,7 +127,7 @@ class CsvTransform
           new_relation['primary_record_uuid'] = matching_primary['uuid']
           new_relation['primary_record_type'] = EDITION_MODEL
           new_relation['related_record_uuid'] = matching_related['uuid']
-          new_relation['related_record_type'] = 'CoreDataConnector:Person'
+          new_relation['related_record_type'] = 'CoreDataConnector::Person'
           csv_out << transform_relationship(new_relation)
         end
       end
@@ -150,7 +150,7 @@ class CsvTransform
           new_relation['primary_record_uuid'] = matching_primary['uuid']
           new_relation['primary_record_type'] = EDITION_MODEL
           new_relation['related_record_uuid'] = matching_related['uuid']
-          new_relation['related_record_type'] = 'CoreDataConnector:Organization'
+          new_relation['related_record_type'] = 'CoreDataConnector::Organization'
           csv_out << transform_relationship(new_relation)
         end
       end
@@ -171,9 +171,9 @@ class CsvTransform
           new_relation = {}
           new_relation['project_model_relationship_id'] = @env['PROJECT_MODEL_RELATIONSHIP_ID_EDITIONS_PUBLISHERS'].to_i
           new_relation['primary_record_uuid'] = matching_primary['uuid']
-          new_relation['primary_record_type'] = 'CoreDataConnector:Organization'
+          new_relation['primary_record_type'] = 'CoreDataConnector::Organization'
           new_relation['related_record_uuid'] = matching_related['uuid']
-          new_relation['related_record_type'] = 'CoreDataConnector:Place'
+          new_relation['related_record_type'] = 'CoreDataConnector::Place'
           csv_out << transform_relationship(new_relation)
         end
       end
@@ -194,9 +194,9 @@ class CsvTransform
           new_relation = {}
           new_relation['project_model_relationship_id'] = @env['PROJECT_MODEL_RELATIONSHIP_ID_ARCHIVES_PLACES'].to_i
           new_relation['primary_record_uuid'] = matching_primary['uuid']
-          new_relation['primary_record_type'] = 'CoreDataConnector:Organization'
+          new_relation['primary_record_type'] = 'CoreDataConnector::Organization'
           new_relation['related_record_uuid'] = matching_related['uuid']
-          new_relation['related_record_type'] = 'CoreDataConnector:Place'
+          new_relation['related_record_type'] = 'CoreDataConnector::Place'
           csv_out << transform_relationship(new_relation)
         end
       end
