@@ -4,6 +4,8 @@ require 'dotenv'
 require 'optparse'
 require 'securerandom'
 
+require_relative '../../core/archive'
+
 EDITION_MODEL = 'CoreDataConnector::Item'
 
 class CsvTransform
@@ -14,7 +16,7 @@ class CsvTransform
 
     @model_files = [
       'archives',
-      'editions',
+      'items',
       'people',
       'places',
       'publishers',
@@ -67,7 +69,7 @@ class CsvTransform
 
   def parse_editions_archives
     primary_records = CSV.read("#{@output_path}/archives.csv", headers: true)
-    related_records = CSV.read("#{@output_path}/editions.csv", headers: true)
+    related_records = CSV.read("#{@output_path}/items.csv", headers: true)
     relations = CSV.read("#{@input_path}/editions_archives.csv", headers: true)
 
     CSV.open("#{@output_path}/relationships.csv", 'a') do |csv_out|
@@ -89,7 +91,7 @@ class CsvTransform
   end
 
   def parse_editions_editions
-    editions = CSV.read("#{@output_path}/editions.csv", headers: true)
+    editions = CSV.read("#{@output_path}/items.csv", headers: true)
     relations = CSV.read("#{@input_path}/editions_editions.csv", headers: true)
 
     CSV.open("#{@output_path}/relationships.csv", 'a') do |csv_out|
@@ -115,7 +117,7 @@ class CsvTransform
   # or null. Maybe we can just name the relationship "Authors" and
   # leave it at that.
   def parse_editions_people
-    editions = CSV.read("#{@output_path}/editions.csv", headers: true)
+    editions = CSV.read("#{@output_path}/items.csv", headers: true)
     people = CSV.read("#{@output_path}/people.csv", headers: true)
     relations = CSV.read("#{@input_path}/editions_people.csv", headers: true)
 
@@ -138,7 +140,7 @@ class CsvTransform
   end
 
   def parse_editions_publishers
-    editions = CSV.read("#{@output_path}/editions.csv", headers: true)
+    editions = CSV.read("#{@output_path}/items.csv", headers: true)
     publishers = CSV.read("#{@output_path}/publishers.csv", headers: true)
     relations = CSV.read("#{@input_path}/editions_publishers.csv", headers: true)
 
@@ -206,6 +208,27 @@ class CsvTransform
     end
   end
 
+  # The import service expects one file for each type
+  # of model. Both archives and publishers are
+  # organizations. Fortunately, they have the same list
+  # of fields, so we can just concat the two files.
+  def combine_organizations
+    File.rename("#{@output_path}/archives.csv", "#{@output_path}/organizations.csv")
+
+    CSV.open("#{@output_path}/organizations.csv", 'a') do |csv_out|
+      header_found = false
+      CSV.foreach("#{@output_path}/publishers.csv") do |pub|
+        # Ignore the header row
+        if header_found
+          csv_out << pub
+        end
+        header_found = true
+      end
+    end
+
+    File.delete("#{@output_path}/publishers.csv")
+  end
+
   # Removes extraneous M2M files from the output dir.
   def cleanup
     @relation_files.each do |file|
@@ -244,4 +267,17 @@ transform.parse_editions_people
 transform.parse_editions_publishers
 transform.parse_publishers_places
 transform.parse_archives_places
+transform.combine_organizations
 transform.cleanup
+
+filepaths = [
+  "#{options[:output]}/items.csv",
+  "#{options[:output]}/organizations.csv",
+  "#{options[:output]}/people.csv",
+  "#{options[:output]}/places.csv",
+  "#{options[:output]}/relationships.csv",
+  "#{options[:output]}/works.csv"
+]
+
+archive = Archive.new
+archive.create_archive(filepaths, options[:output])
