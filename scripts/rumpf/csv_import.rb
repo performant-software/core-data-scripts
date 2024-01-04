@@ -36,14 +36,14 @@ class CsvTransform
   def add_uuids
     @model_files.each do |filename|
       CSV.open("#{@output_path}/#{filename}.csv", 'w') do |csv_out|
-        table = CSV.read("#{@input_path}/#{filename}.csv", headers: true)
+        table = CSV.read("#{@input_path}/#{filename}.csv")
 
-        csv_out << [*table[0].to_h.keys, 'uuid', 'project_model_id']
+        csv_out << ['project_model_id', 'uuid', *table[0]]
 
-        table.each do |row|
-          row['uuid'] = SecureRandom.uuid
-          row['project_model_id'] = @env["PROJECT_MODEL_ID_#{filename.upcase}"].to_i
-          csv_out << row
+        table.each_with_index do |row, idx|
+          unless idx == 0
+            csv_out << [@env["PROJECT_MODEL_ID_#{filename.upcase}"].to_i, SecureRandom.uuid, *row]
+          end
         end
       end
     end
@@ -112,10 +112,6 @@ class CsvTransform
     end
   end
 
-  # TODO: There are some user-defined fields on this relation.
-  # The only UDF is "role", and all of these are either "author"
-  # or null. Maybe we can just name the relationship "Authors" and
-  # leave it at that.
   def parse_editions_people
     editions = CSV.read("#{@output_path}/items.csv", headers: true)
     people = CSV.read("#{@output_path}/people.csv", headers: true)
