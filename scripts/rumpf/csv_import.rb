@@ -14,6 +14,47 @@ class CsvTransform
     @output_path = output
     @env = env
 
+    @fields = {
+      archives: {
+        'name': 'name',
+        'description': nil
+      },
+      items: {
+        'name': 'title',
+        "udf_#{@env['UDF_EDITIONS_NOTES_UUID']}": 'notes',
+        "udf_#{@env['UDF_EDITIONS_TYPE_UUID']}": 'type',
+        "udf_#{@env['UDF_EDITIONS_FORMAT_UUID']}": 'format',
+        "udf_#{@env['UDF_EDITIONS_LINE_UUID']}": 'line',
+        "udf_#{@env['UDF_EDITIONS_BNF_UUID']}": 'bnf',
+        "udf_#{@env['UDF_EDITIONS_DPLA_UUID']}": 'dpla',
+        "udf_#{@env['UDF_EDITIONS_JISC_UUID']}": 'jisc',
+        "udf_#{@env['UDF_EDITIONS_PUBLICATION_DATE_UUID']}": 'publication_date'
+      },
+      people: {
+        'last_name': nil,
+        'first_name': 'full_name',
+        'middle_name': nil,
+        'biography': nil,
+        "udf_#{@env['UDF_PEOPLE_VIAF_UUID']}": 'viaf',
+        "udf_#{@env['UDF_PEOPLE_WIKIDATA_UUID']}": 'wikidata'
+      },
+      places: {
+        'name': 'name',
+        'latitude': nil,
+        'longitude': nil,
+        "udf_#{@env['UDF_PLACES_VIAF_UUID']}": 'viaf',
+        "udf_#{@env['UDF_PLACES_WIKIDATA_UUID']}": 'wikidata'
+      },
+      publishers: {
+        'name': 'name',
+        'description': nil
+      },
+      works: {
+        'name': 'name',
+        "udf_#{@env['UDF_WORKS_STATUS_UUID']}": 'status'
+      }
+    }
+
     @model_files = [
       'archives',
       'items',
@@ -33,28 +74,37 @@ class CsvTransform
     ]
   end
 
-  def add_uuids
-    @model_files.each do |filename|
-      CSV.open("#{@output_path}/#{filename}.csv", 'w') do |csv_out|
-        table = CSV.read("#{@input_path}/#{filename}.csv")
-
-        csv_out << ['project_model_id', 'uuid', *table[0]]
-
-        table.each_with_index do |row, idx|
-          unless idx == 0
-            csv_out << [@env["PROJECT_MODEL_ID_#{filename.upcase}"].to_i, SecureRandom.uuid, *row]
-          end
-        end
-      end
-    end
-  end
-
   # Set up the relationships file
   def init_relationships
     File.write(
       "#{@output_path}/relationships.csv",
       "project_model_relationship_id,primary_record_uuid,primary_record_type,related_record_uuid,related_record_type\n"
     )
+  end
+
+  def parse_models
+    @model_files.each do |filename|
+      CSV.open("#{@output_path}/#{filename}.csv", 'w') do |csv_out|
+        table = CSV.read("#{@input_path}/#{filename}.csv", headers: true)
+
+        # Set up header
+        csv_out << [
+          'project_model_id',
+          'uuid',
+          *@fields[filename.to_sym].keys,
+          'directus_id'
+        ]
+
+        table.each do |row|
+          csv_out << [
+            @env["PROJECT_MODEL_ID_#{filename.upcase}"].to_i,
+            SecureRandom.uuid,
+            *@fields[filename.to_sym].values.map { |val| val == nil ? val : row[val] },
+            row['id']
+          ]
+        end
+      end
+    end
   end
 
   def transform_relationship(relation_obj)
@@ -74,8 +124,8 @@ class CsvTransform
 
     CSV.open("#{@output_path}/relationships.csv", 'a') do |csv_out|
       relations.each do |relation|
-        matching_primary = related_records.find { |rr| rr['id'] == relation['editions_id'] }
-        matching_related = primary_records.find { |pr| pr['id'] == relation['archives_id'] }
+        matching_primary = related_records.find { |rr| rr['directus_id'] == relation['editions_id'] }
+        matching_related = primary_records.find { |pr| pr['directus_id'] == relation['archives_id'] }
 
         if matching_related && matching_primary
           new_relation = {}
@@ -96,8 +146,8 @@ class CsvTransform
 
     CSV.open("#{@output_path}/relationships.csv", 'a') do |csv_out|
       relations.each do |relation|
-        matching_primary = editions.find { |ed| ed['id'] == relation['parent_edition_id']}
-        matching_related = editions.find { |ed| ed['id'] == relation['child_edition_id']}
+        matching_primary = editions.find { |ed| ed['directus_id'] == relation['parent_edition_id']}
+        matching_related = editions.find { |ed| ed['directus_id'] == relation['child_edition_id']}
 
         if matching_related && matching_primary
           new_relation = {}
@@ -119,8 +169,8 @@ class CsvTransform
 
     CSV.open("#{@output_path}/relationships.csv", 'a') do |csv_out|
       relations.each do |relation|
-        matching_primary = editions.find { |ed| ed['id'] == relation['editions_id']}
-        matching_related = people.find { |ed| ed['id'] == relation['people_id']}
+        matching_primary = editions.find { |ed| ed['directus_id'] == relation['editions_id']}
+        matching_related = people.find { |ed| ed['directus_id'] == relation['people_id']}
 
         if matching_related && matching_primary
           new_relation = {}
@@ -142,8 +192,8 @@ class CsvTransform
 
     CSV.open("#{@output_path}/relationships.csv", 'a') do |csv_out|
       relations.each do |relation|
-        matching_primary = editions.find { |ed| ed['id'] == relation['editions_id']}
-        matching_related = publishers.find { |ed| ed['id'] == relation['publishers_id']}
+        matching_primary = editions.find { |ed| ed['directus_id'] == relation['editions_id']}
+        matching_related = publishers.find { |ed| ed['directus_id'] == relation['publishers_id']}
 
         if matching_related && matching_primary
           new_relation = {}
@@ -165,8 +215,8 @@ class CsvTransform
 
     CSV.open("#{@output_path}/relationships.csv", 'a') do |csv_out|
       relations.each do |relation|
-        matching_primary = publishers.find { |ed| ed['id'] == relation['publishers_id']}
-        matching_related = places.find { |ed| ed['id'] == relation['places_id']}
+        matching_primary = publishers.find { |ed| ed['directus_id'] == relation['publishers_id']}
+        matching_related = places.find { |ed| ed['directus_id'] == relation['places_id']}
 
         if matching_related && matching_primary
           new_relation = {}
@@ -188,8 +238,8 @@ class CsvTransform
 
     CSV.open("#{@output_path}/relationships.csv", 'a') do |csv_out|
       relations.each do |relation|
-        matching_primary = archives.find { |ed| ed['id'] == relation['archives_id']}
-        matching_related = places.find { |ed| ed['id'] == relation['places_id']}
+        matching_primary = archives.find { |ed| ed['directus_id'] == relation['archives_id']}
+        matching_related = places.find { |ed| ed['directus_id'] == relation['places_id']}
 
         if matching_related && matching_primary
           new_relation = {}
@@ -256,7 +306,7 @@ transform = CsvTransform.new(
 )
 
 transform.init_relationships
-transform.add_uuids
+transform.parse_models
 transform.parse_editions_archives
 transform.parse_editions_editions
 transform.parse_editions_people
