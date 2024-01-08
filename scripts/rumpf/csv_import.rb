@@ -63,15 +63,6 @@ class CsvTransform
       'publishers',
       'works'
     ]
-
-    @relation_files = [
-      'archives_places',
-      'editions_archives',
-      'editions_editions',
-      'editions_people',
-      'editions_publishers',
-      'publishers_places'
-    ]
   end
 
   # Set up the relationships file
@@ -84,7 +75,7 @@ class CsvTransform
 
   def parse_models
     @model_files.each do |filename|
-      CSV.open("#{@output_path}/#{filename}.csv", 'w') do |csv_out|
+      CSV.open("#{@output_path}/temp_#{filename}.csv", 'w') do |csv_out|
         table = CSV.read("#{@input_path}/#{filename}.csv", headers: true)
 
         # Set up header
@@ -118,8 +109,8 @@ class CsvTransform
   end
 
   def parse_editions_archives
-    primary_records = CSV.read("#{@output_path}/archives.csv", headers: true)
-    related_records = CSV.read("#{@output_path}/items.csv", headers: true)
+    primary_records = CSV.read("#{@output_path}/temp_archives.csv", headers: true)
+    related_records = CSV.read("#{@output_path}/temp_items.csv", headers: true)
     relations = CSV.read("#{@input_path}/editions_archives.csv", headers: true)
 
     CSV.open("#{@output_path}/relationships.csv", 'a') do |csv_out|
@@ -141,7 +132,7 @@ class CsvTransform
   end
 
   def parse_editions_editions
-    editions = CSV.read("#{@output_path}/items.csv", headers: true)
+    editions = CSV.read("#{@output_path}/temp_items.csv", headers: true)
     relations = CSV.read("#{@input_path}/editions_editions.csv", headers: true)
 
     CSV.open("#{@output_path}/relationships.csv", 'a') do |csv_out|
@@ -163,8 +154,8 @@ class CsvTransform
   end
 
   def parse_editions_people
-    editions = CSV.read("#{@output_path}/items.csv", headers: true)
-    people = CSV.read("#{@output_path}/people.csv", headers: true)
+    editions = CSV.read("#{@output_path}/temp_items.csv", headers: true)
+    people = CSV.read("#{@output_path}/temp_people.csv", headers: true)
     relations = CSV.read("#{@input_path}/editions_people.csv", headers: true)
 
     CSV.open("#{@output_path}/relationships.csv", 'a') do |csv_out|
@@ -186,8 +177,8 @@ class CsvTransform
   end
 
   def parse_editions_publishers
-    editions = CSV.read("#{@output_path}/items.csv", headers: true)
-    publishers = CSV.read("#{@output_path}/publishers.csv", headers: true)
+    editions = CSV.read("#{@output_path}/temp_items.csv", headers: true)
+    publishers = CSV.read("#{@output_path}/temp_publishers.csv", headers: true)
     relations = CSV.read("#{@input_path}/editions_publishers.csv", headers: true)
 
     CSV.open("#{@output_path}/relationships.csv", 'a') do |csv_out|
@@ -209,8 +200,8 @@ class CsvTransform
   end
 
   def parse_publishers_places
-    publishers = CSV.read("#{@output_path}/publishers.csv", headers: true)
-    places = CSV.read("#{@output_path}/places.csv", headers: true)
+    publishers = CSV.read("#{@output_path}/temp_publishers.csv", headers: true)
+    places = CSV.read("#{@output_path}/temp_places.csv", headers: true)
     relations = CSV.read("#{@input_path}/publishers_places.csv", headers: true)
 
     CSV.open("#{@output_path}/relationships.csv", 'a') do |csv_out|
@@ -232,8 +223,8 @@ class CsvTransform
   end
 
   def parse_archives_places
-    archives = CSV.read("#{@output_path}/archives.csv", headers: true)
-    places = CSV.read("#{@output_path}/places.csv", headers: true)
+    archives = CSV.read("#{@output_path}/temp_archives.csv", headers: true)
+    places = CSV.read("#{@output_path}/temp_places.csv", headers: true)
     relations = CSV.read("#{@input_path}/archives_places.csv", headers: true)
 
     CSV.open("#{@output_path}/relationships.csv", 'a') do |csv_out|
@@ -259,11 +250,11 @@ class CsvTransform
   # organizations. Fortunately, they have the same list
   # of fields, so we can just concat the two files.
   def combine_organizations
-    File.rename("#{@output_path}/archives.csv", "#{@output_path}/organizations.csv")
+    File.rename("#{@output_path}/temp_archives.csv", "#{@output_path}/temp_organizations.csv")
 
-    CSV.open("#{@output_path}/organizations.csv", 'a') do |csv_out|
+    CSV.open("#{@output_path}/temp_organizations.csv", 'a') do |csv_out|
       header_found = false
-      CSV.foreach("#{@output_path}/publishers.csv") do |pub|
+      CSV.foreach("#{@output_path}/temp_publishers.csv") do |pub|
         # Ignore the header row
         if header_found
           csv_out << pub
@@ -272,14 +263,26 @@ class CsvTransform
       end
     end
 
-    File.delete("#{@output_path}/publishers.csv")
+    File.delete("#{@output_path}/temp_publishers.csv")
   end
 
-  # Removes extraneous M2M files from the output dir.
+  # Remove the directus_id column, which was needed to
+  # build relationships but confuses the CD importer.
   def cleanup
-    @relation_files.each do |file|
-      file_path = "#{@output_path}/#{file}.csv"
-      File.delete(file_path) if File.exist?(file_path)
+    [
+      'items',
+      'organizations',
+      'people',
+      'places',
+      'works'
+    ].each do |filename|
+      File.open("#{@output_path}/#{filename}.csv", 'w') do |file|
+        temp_table = CSV.read("#{@output_path}/temp_#{filename}.csv", headers: true)
+        temp_table.delete('directus_id')
+        file.write(temp_table.to_csv)
+      end
+
+      File.delete("#{@output_path}/temp_#{filename}.csv")
     end
   end
 end
