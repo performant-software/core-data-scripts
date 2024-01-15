@@ -15,4 +15,142 @@ config = fields_arr.map do |f|
   }
 end
 
+puts 'Fields:'
 puts config.pretty_inspect
+
+# This is the result of the output above but I'm keeping all the code around just in case!
+columns = [{
+  name: 'Item Id',
+  type: 'INTEGER'
+},
+{
+  name: 'Item URI',
+  type: 'VARCHAR'
+},
+{
+  name: 'Dublin Core:Title',
+  type: 'VARCHAR'
+},
+{
+  name: 'Dublin Core:Subject',
+  type: 'VARCHAR'
+},
+{
+  name: 'Dublin Core:Description',
+  type: 'TEXT'
+},
+{
+  name: 'Dublin Core:Creator',
+  type: 'VARCHAR'
+},
+{
+  name: 'Dublin Core:Source',
+  type: 'VARCHAR'
+},
+{
+  name: 'Dublin Core:Publisher',
+  type: 'VARCHAR'
+},
+{
+  name: 'Dublin Core:Date',
+  type: 'INTEGER'
+},
+{
+  name: 'Dublin Core:Contributor',
+  type: 'VARCHAR'
+},
+{
+  name: 'Dublin Core:Rights',
+  type: 'VARCHAR'
+},
+{
+  name: 'Dublin Core:Format',
+  type: 'VARCHAR'
+},
+{
+  name: 'Dublin Core:Language',
+  type: 'VARCHAR'
+},
+{
+  name: 'Dublin Core:Type',
+  type: 'VARCHAR'
+},
+{
+  name: 'Dublin Core:Identifier',
+  type: 'VARCHAR'
+},
+{
+  name: 'Dublin Core:Coverage',
+  type: 'VARCHAR'
+},
+{
+  name: 'Item Type Metadata:geolocation:address',
+  type: 'VARCHAR'
+},
+{
+  name: 'Item Type Metadata:geolocation:zoom_level',
+  type: 'INTEGER'
+},
+{
+  name: 'Item Type Metadata:geolocation:longitude',
+  type: 'DECIMAL'
+},
+{
+  name: 'Item Type Metadata:geolocation:latitude',
+  type: 'DECIMAL'
+},
+{
+  name: 'Item Type Metadata:County',
+  type: 'VARCHAR'
+},
+{
+  name: 'Item Type Metadata:Elev_f',
+  type: 'INTEGER'
+},
+{
+  name: 'Item Type Metadata:Elev_m',
+  type: 'INTEGER'
+},
+{
+  name: 'Item Type Metadata:TopoName',
+  type: 'VARCHAR'
+},
+{
+  name: 'Item Type Metadata:Coordinates',
+  type: 'VARCHAR'
+},
+{
+  name: 'Item Type Metadata:Identifier',
+  type: 'INTEGER'
+},
+{
+  name: 'Item Type Metadata:URL',
+  type: 'VARCHAR'
+},
+{
+  name: 'tags',
+  type: 'VARCHAR'
+},
+{
+  name: 'itemType',
+  type: 'VARCHAR'
+},
+{
+  name: 'collection',
+  type: 'VARCHAR'
+},
+{
+  name: 'public',
+  type: 'BOOLEAN'
+},
+{
+  name: 'featured',
+  type: 'BOOLEAN'
+}]
+
+keys = columns.map do |col|
+  "UDF_#{col[:name].upcase.gsub(/[^\w]/, '_')}=\"todo\""
+end
+
+puts 'Env keys:'
+puts keys

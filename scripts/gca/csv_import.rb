@@ -60,7 +60,8 @@ class GbofCsvImport < Csv::Adapter
 
   protected
 
-  @fields = [{
+  def column_names
+    [{
       name: 'Item Id',
       type: 'INTEGER'
     },
@@ -187,8 +188,8 @@ class GbofCsvImport < Csv::Adapter
     {
       name: 'featured',
       type: 'BOOLEAN'
-    }
-  ]
+    }]
+  end
 end
 
 # Parse environment variables
