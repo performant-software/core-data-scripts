@@ -82,7 +82,6 @@ transform = CsvTransform.new(
   relation_udfs: relation_udfs
 )
 
-# TODO: don't forget about the UDFs in some of the relation files!!!!
 transform.init_relationships
 transform.parse_models
 transform.parse_relation('items', 'places')
