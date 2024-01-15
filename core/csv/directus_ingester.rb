@@ -10,11 +10,8 @@ module Csv
       @fields = fields
       @model_files = model_files
       @relation_udfs = relation_udfs
-    end
 
-    # Set up the relationships file
-    def init_relationships
-      header_list = [
+      @relationship_headers = [
         'project_model_relationship_id',
         'primary_record_uuid',
         'primary_record_type',
@@ -22,18 +19,20 @@ module Csv
         'related_record_type'
       ]
 
-      # TODO
       if @relation_udfs && @relation_udfs.count > 0
         @relation_udfs.values.each do |udf_hash|
           udf_hash.keys.each do |key|
-            header_list.push(key)
+            @relationship_headers.push(key)
           end
         end
       end
+    end
 
+    # Set up the relationships file
+    def init_relationships
       File.write(
         "#{@output_path}/relationships.csv",
-        "#{header_list.join(',')}\n"
+        "#{@relationship_headers.join(',')}\n"
       )
     end
 
@@ -79,44 +78,38 @@ module Csv
       env_var = "PROJECT_MODEL_RELATIONSHIP_ID_#{primary.upcase}_#{related.upcase}"
 
       CSV.open("#{@output_path}/relationships.csv", 'a') do |csv_out|
-      relations.each do |relation|
-        matching_primary = primary_table.find { |ed| ed['directus_id'] == relation[primary_id_column]}
-        matching_related = related_table.find { |ed| ed['directus_id'] == relation[related_id_column]}
+        relations.each do |relation|
+          matching_primary = primary_table.find { |ed| ed['directus_id'] == relation[primary_id_column]}
+          matching_related = related_table.find { |ed| ed['directus_id'] == relation[related_id_column]}
 
-        if matching_related && matching_primary
-          new_relation = {}
-          new_relation['project_model_relationship_id'] = @env[env_var].to_i
-          new_relation['primary_record_uuid'] = matching_primary['uuid']
-          new_relation['primary_record_type'] = primary_model_name
-          new_relation['related_record_uuid'] = matching_related['uuid']
-          new_relation['related_record_type'] = related_model_name
+          if matching_related && matching_primary
+            new_relation = {}
+            new_relation['project_model_relationship_id'] = @env[env_var].to_i
+            new_relation['primary_record_uuid'] = matching_primary['uuid']
+            new_relation['primary_record_type'] = primary_model_name
+            new_relation['related_record_uuid'] = matching_related['uuid']
+            new_relation['related_record_type'] = related_model_name
 
-          result = order_relationship(new_relation)
+            user_defined_fields = @relation_udfs["#{primary}_#{related}".to_sym]
 
-          # TODO - not quite working yet
-          user_defined_fields = @relation_udfs["#{primary}_#{related}".to_sym]
-          if user_defined_fields
-            user_defined_fields.keys.each do |key|
-              result[user_defined_fields[key]] = relations[user_defined_fields[key]]
+            if user_defined_fields
+              user_defined_fields.keys.each do |key|
+                new_relation[key] = relation[user_defined_fields[key]]
+              end
             end
-          end
 
-          csv_out << result
+            result = order_relationship(new_relation)
+
+            csv_out << result
+          end
         end
       end
-    end
     end
 
     # Keeps us from having to worry about the
     # order of the keys in the obj we create
     def order_relationship(relation_obj)
-      [
-        'project_model_relationship_id',
-        'primary_record_uuid',
-        'primary_record_type',
-        'related_record_uuid',
-        'related_record_type'
-      ].map { |field| relation_obj[field] }
+      @relationship_headers.map { |field| relation_obj[field] }
     end
 
     # Remove the directus_id column, which was needed to
