@@ -48,7 +48,6 @@ column_names = [
   'Item Type Metadata:Elev_f',
   'Item Type Metadata:Elev_m',
   'Item Type Metadata:TopoName',
-  'Item Type Metadata:Coordinates',
   'Item Type Metadata:Identifier',
   'Item Type Metadata:URL',
   'tags'
@@ -57,8 +56,8 @@ column_names = [
 fields = {
   places: {
     'name': 'Dublin Core:Title',
-    'longitude': 'Item Type Metadata:geolocation:longitude',
     'latitude': 'Item Type Metadata:geolocation:latitude',
+    'longitude': 'Item Type Metadata:geolocation:longitude'
   }
 }
 

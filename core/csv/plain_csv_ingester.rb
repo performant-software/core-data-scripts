@@ -69,7 +69,7 @@ module Csv
             csv_out << [
               @env["PROJECT_MODEL_ID_#{filename.upcase}"].to_i,
               SecureRandom.uuid,
-              *@fields[filename.to_sym].values.map { |val| val == nil ? val : row[val] },
+              *@fields[filename.to_sym].values.map { |val| row[val] ? row[val].gsub(/\A\p{Space}*/, '') : nil },
               row[@id_column]
             ]
           end
