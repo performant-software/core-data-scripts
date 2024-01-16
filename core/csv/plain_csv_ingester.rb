@@ -1,6 +1,8 @@
 require 'active_support/all'
 require 'csv'
 
+require_relative './id_mapper'
+
 module Csv
   class PlainCsvIngester
     def initialize(
@@ -54,7 +56,18 @@ module Csv
 
     def parse_models
       @model_files.each do |filename|
-        CSV.open("#{@output_path}/temp_#{filename}.csv", 'w') do |csv_out|
+        temp_file_path = "#{@output_path}/temp_#{filename}.csv"
+        json_file_path = "#{@output_path}/#{filename}_map.json"
+
+        mapper = IdMapper.new(
+          csv_path: temp_file_path,
+          json_path: json_file_path,
+          id_column: @id_column
+        )
+
+        id_map = mapper.get_hashmap
+
+        CSV.open(temp_file_path, 'w') do |csv_out|
           table = CSV.read("#{@input_path}/#{filename}.csv", headers: true)
 
           # Set up header
@@ -66,14 +79,20 @@ module Csv
           ]
 
           table.each do |row|
+            unless id_map[row[@id_column]]
+              id_map[row[@id_column]] = SecureRandom.uuid
+            end
+
             csv_out << [
               @env["PROJECT_MODEL_ID_#{filename.upcase}"].to_i,
-              SecureRandom.uuid,
+              id_map[row[@id_column]],
               *@fields[filename.to_sym].values.map { |val| row[val] ? row[val].gsub(/\A\p{Space}*/, '') : nil },
               row[@id_column]
             ]
           end
         end
+
+        mapper.write_hashmap(id_map)
       end
     end
 
