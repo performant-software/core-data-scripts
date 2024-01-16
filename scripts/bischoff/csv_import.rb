@@ -2,9 +2,9 @@ require 'dotenv'
 require 'optparse'
 
 require_relative '../../core/archive'
-require_relative '../../core/csv/directus_ingester'
+require_relative '../../core/csv/plain_csv_ingester'
 
-class CsvTransform < Csv::DirectusIngester
+class CsvTransform < Csv::PlainCsvIngester
 
 end
 
@@ -89,7 +89,7 @@ transform.parse_relation('items', 'works')
 transform.parse_relation('items', 'organizations')
 transform.parse_relation('organizations', 'places')
 transform.parse_relation('works', 'people')
-transform.remove_directus_ids(model_files)
+transform.cleanup(model_files)
 
 filepaths = [
   "#{options[:output]}/relationships.csv"

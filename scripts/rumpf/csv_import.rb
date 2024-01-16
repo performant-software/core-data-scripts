@@ -5,17 +5,17 @@ require 'optparse'
 require 'securerandom'
 
 require_relative '../../core/archive'
-require_relative '../../core/csv/directus_ingester'
+require_relative '../../core/csv/plain_csv_ingester'
 
-class CsvTransform < Csv::DirectusIngester
+class CsvTransform < Csv::PlainCsvIngester
   def parse_editions_editions
     editions = CSV.read("#{@output_path}/temp_items.csv", headers: true)
     relations = CSV.read("#{@input_path}/items_items.csv", headers: true)
 
     CSV.open("#{@output_path}/relationships.csv", 'a') do |csv_out|
       relations.each do |relation|
-        matching_primary = editions.find { |ed| ed['directus_id'] == relation['parent_edition_id']}
-        matching_related = editions.find { |ed| ed['directus_id'] == relation['child_edition_id']}
+        matching_primary = editions.find { |ed| ed['original_id'] == relation['parent_edition_id']}
+        matching_related = editions.find { |ed| ed['original_id'] == relation['child_edition_id']}
 
         if matching_related && matching_primary
           new_relation = {}
@@ -134,7 +134,7 @@ transform.parse_relation('items', 'publishers', nil, 'CoreDataConnector::Organiz
 transform.parse_relation('publishers', 'places', 'CoreDataConnector::Organization')
 transform.parse_relation('archives', 'places', 'CoreDataConnector::Organization')
 transform.combine_organizations
-transform.remove_directus_ids([
+transform.cleanup([
   'items',
   'organizations',
   'people',

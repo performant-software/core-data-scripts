@@ -1,228 +1,84 @@
+require 'csv'
 require 'dotenv'
 require 'optparse'
+require 'securerandom'
 
-require_relative '../../core/csv/adapter'
 require_relative '../../core/archive'
+require_relative '../../core/csv/plain_csv_ingester'
 
-class GbofCsvImport < Csv::Adapter
-  def cleanup
-    super
-
-    execute <<-SQL.squish
-      DROP TABLE IF EXISTS z_places
-    SQL
-  end
-
-  def load
-    super
-
-    export 'places.csv', <<-SQL.squish
-      SELECT project_model_id,
-             uuid,
-             name,
-             latitude,
-             longitude,
-             #{user_defined_column('PLACE_ADDRESS_UUID')}
-        FROM z_places
-       ORDER BY name
-    SQL
-  end
-
-  def setup
-    super
-
-    execute <<-SQL.squish
-      CREATE EXTENSION IF NOT EXISTS pgcrypto
-    SQL
-
-    execute <<-SQL.squish
-      CREATE TABLE z_places (
-        id SERIAL,
-        uuid UUID DEFAULT gen_random_uuid(),
-        project_model_id INTEGER,
-        name VARCHAR,
-        latitude DECIMAL,
-        longitude DECIMAL,
-      )
-    SQL
-  end
-
-  def transform
-    super
-
-    execute <<-SQL.squish
-      INSERT INTO z_places ( project_model_id, name, latitude, longitude )
-      SELECT #{env['PROJECT_MODEL_ID_PLACES'].to_i}, name, latitude, longitude
-        FROM #{table_name}
-      WHERE ( latitude IS NOT NULL AND longitude IS NOT NULL )
-    SQL
-  end
-
-  protected
-
-  def column_names
-    [{
-      name: 'Item Id',
-      type: 'INTEGER'
-    },
-    {
-      name: 'Item URI',
-      type: 'VARCHAR'
-    },
-    {
-      name: 'Dublin Core:Title',
-      type: 'VARCHAR'
-    },
-    {
-      name: 'Dublin Core:Subject',
-      type: 'VARCHAR'
-    },
-    {
-      name: 'Dublin Core:Description',
-      type: 'TEXT'
-    },
-    {
-      name: 'Dublin Core:Creator',
-      type: 'VARCHAR'
-    },
-    {
-      name: 'Dublin Core:Source',
-      type: 'VARCHAR'
-    },
-    {
-      name: 'Dublin Core:Publisher',
-      type: 'VARCHAR'
-    },
-    {
-      name: 'Dublin Core:Date',
-      type: 'INTEGER'
-    },
-    {
-      name: 'Dublin Core:Contributor',
-      type: 'VARCHAR'
-    },
-    {
-      name: 'Dublin Core:Rights',
-      type: 'VARCHAR'
-    },
-    {
-      name: 'Dublin Core:Format',
-      type: 'VARCHAR'
-    },
-    {
-      name: 'Dublin Core:Language',
-      type: 'VARCHAR'
-    },
-    {
-      name: 'Dublin Core:Type',
-      type: 'VARCHAR'
-    },
-    {
-      name: 'Dublin Core:Identifier',
-      type: 'VARCHAR'
-    },
-    {
-      name: 'Dublin Core:Coverage',
-      type: 'VARCHAR'
-    },
-    {
-      name: 'Item Type Metadata:geolocation:address',
-      type: 'VARCHAR'
-    },
-    {
-      name: 'Item Type Metadata:geolocation:zoom_level',
-      type: 'INTEGER'
-    },
-    {
-      name: 'Item Type Metadata:geolocation:longitude',
-      type: 'DECIMAL'
-    },
-    {
-      name: 'Item Type Metadata:geolocation:latitude',
-      type: 'DECIMAL'
-    },
-    {
-      name: 'Item Type Metadata:County',
-      type: 'VARCHAR'
-    },
-    {
-      name: 'Item Type Metadata:Elev_f',
-      type: 'INTEGER'
-    },
-    {
-      name: 'Item Type Metadata:Elev_m',
-      type: 'INTEGER'
-    },
-    {
-      name: 'Item Type Metadata:TopoName',
-      type: 'VARCHAR'
-    },
-    {
-      name: 'Item Type Metadata:Coordinates',
-      type: 'VARCHAR'
-    },
-    {
-      name: 'Item Type Metadata:Identifier',
-      type: 'INTEGER'
-    },
-    {
-      name: 'Item Type Metadata:URL',
-      type: 'VARCHAR'
-    },
-    {
-      name: 'tags',
-      type: 'VARCHAR'
-    },
-    {
-      name: 'itemType',
-      type: 'VARCHAR'
-    },
-    {
-      name: 'collection',
-      type: 'VARCHAR'
-    },
-    {
-      name: 'public',
-      type: 'BOOLEAN'
-    },
-    {
-      name: 'featured',
-      type: 'BOOLEAN'
-    }]
-  end
+# The canonical way of computing the name of the env
+# variable for a given field name so we don't have
+# to type them all out over and over.
+def get_udf_key(field_name)
+  "UDF_#{field_name.upcase.gsub(/[^\w]/, '_')}"
 end
 
 # Parse environment variables
-env = Dotenv.parse './scripts/gbof/.env.development'
+env = Dotenv.parse './scripts/gca/.env.development'
 
 # Parse input options
 options = {}
 
 OptionParser.new do |opts|
-  opts.on '-d DATABASE', '--database DATABASE', 'Database name'
-  opts.on '-u USER', '--user USER', 'Database username'
-  opts.on '-f FILE', '--file FILE', 'Source filepath'
+  opts.on '-i INPUT', '--input INPUT', 'Input directory'
   opts.on '-o OUTPUT', '--output OUTPUT', 'Output directory'
 end.parse!(into: options)
 
-# Run the importer
-import = CsvImport.new(
-  database: options[:database],
-  user: options[:user],
-  filepath: options[:file],
-  output: options[:output],
-  env: env
-)
+unless options[:input] && options[:output]
+  puts 'Input and output directory paths are required in arguments.'
+  exit 1
+end
 
-import.setup
-import.extract
-import.transform
-import.load
-import.cleanup
+model_files = ['places']
 
-filepaths = [
-  '#{options[:output]}/places.csv'
+column_names = [
+  'Item Id',
+  'Item URI',
+  'Dublin Core:Description',
+  'Dublin Core:Source',
+  'Dublin Core:Publisher',
+  'Dublin Core:Date',
+  'Dublin Core:Contributor',
+  'Dublin Core:Rights',
+  'Dublin Core:Language',
+  'Dublin Core:Type',
+  'Dublin Core:Identifier',
+  'Item Type Metadata:geolocation:address',
+  'Item Type Metadata:County',
+  'Item Type Metadata:Elev_f',
+  'Item Type Metadata:Elev_m',
+  'Item Type Metadata:TopoName',
+  'Item Type Metadata:Coordinates',
+  'Item Type Metadata:Identifier',
+  'Item Type Metadata:URL',
+  'tags'
 ]
 
+fields = {
+  places: {
+    'name': 'Dublin Core:Title',
+    'longitude': 'Item Type Metadata:geolocation:longitude',
+    'latitude': 'Item Type Metadata:geolocation:latitude',
+  }
+}
+
+# Fill the fields.places object with more
+column_names.each do |col|
+  fields[:places]["udf_#{env[get_udf_key(col)]}"] = col
+end
+
+# Run the importer
+transform = Csv::PlainCsvIngester.new(
+  input: options[:input],
+  output: options[:output],
+  env: env,
+  fields: fields,
+  model_files: model_files,
+  id_column: 'Item Id'
+)
+
+transform.parse_models
+transform.cleanup(['places'])
+
 archive = Archive.new
-archive.create_archive(filepaths, options[:output])
+archive.create_archive(["#{options[:output]}/places.csv"], options[:output])

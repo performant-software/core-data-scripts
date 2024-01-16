@@ -2,14 +2,30 @@ require 'active_support/all'
 require 'csv'
 
 module Csv
-  class DirectusIngester
-    def initialize(input:, output:, env:, fields:, model_files:, relation_udfs: nil)
+  class PlainCsvIngester
+    def initialize(
+      # The input folder
+      input:,
+      # The output folder
+      output:,
+      # Environment variable object
+      env:,
+      # Object with lists of fields (see existing scripts for examples)
+      fields:,
+      # List of models being imported (e.g. ['places', 'people'])
+      model_files:,
+      # Object with lists of user-defined fields on relations (see existing scripts for examples)
+      relation_udfs: nil,
+      # Name of the column in the input CSV(s) that contains the remote ID
+      id_column: 'id'
+    )
       @input_path = input
       @output_path = output
       @env = env
       @fields = fields
       @model_files = model_files
       @relation_udfs = relation_udfs
+      @id_column = id_column
 
       @relationship_headers = [
         'project_model_relationship_id',
@@ -46,7 +62,7 @@ module Csv
             'project_model_id',
             'uuid',
             *@fields[filename.to_sym].keys,
-            'directus_id'
+            'original_id'
           ]
 
           table.each do |row|
@@ -54,7 +70,7 @@ module Csv
               @env["PROJECT_MODEL_ID_#{filename.upcase}"].to_i,
               SecureRandom.uuid,
               *@fields[filename.to_sym].values.map { |val| val == nil ? val : row[val] },
-              row['id']
+              row[@id_column]
             ]
           end
         end
@@ -69,8 +85,7 @@ module Csv
       primary_id_column = "#{primary}_id"
       related_id_column = "#{related}_id"
 
-      # Accept model name arguments for cases where the
-      # model name is different from the file name
+      # Accept model name arguments for cases where the model name is different from the file name
       primary_model_name = primary_model || "CoreDataConnector::#{primary.singularize.capitalize}"
       related_model_name = related_model || "CoreDataConnector::#{related.singularize.capitalize}"
 
@@ -79,8 +94,8 @@ module Csv
 
       CSV.open("#{@output_path}/relationships.csv", 'a') do |csv_out|
         relations.each do |relation|
-          matching_primary = primary_table.find { |ed| ed['directus_id'] == relation[primary_id_column]}
-          matching_related = related_table.find { |ed| ed['directus_id'] == relation[related_id_column]}
+          matching_primary = primary_table.find { |ed| ed['original_id'] == relation[primary_id_column]}
+          matching_related = related_table.find { |ed| ed['original_id'] == relation[related_id_column]}
 
           if matching_related && matching_primary
             new_relation = {}
@@ -112,13 +127,13 @@ module Csv
       @relationship_headers.map { |field| relation_obj[field] }
     end
 
-    # Remove the directus_id column, which was needed to
+    # Remove the original_id column, which was needed to
     # build relationships but confuses the CD importer.
-    def remove_directus_ids(filenames)
+    def cleanup(filenames)
       filenames.each do |filename|
         File.open("#{@output_path}/#{filename}.csv", 'w') do |file|
           temp_table = CSV.read("#{@output_path}/temp_#{filename}.csv", headers: true)
-          temp_table.delete('directus_id')
+          temp_table.delete('original_id')
           file.write(temp_table.to_csv)
         end
 
