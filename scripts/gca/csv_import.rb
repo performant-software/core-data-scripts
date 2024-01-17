@@ -112,5 +112,11 @@ transform.parse_models
 transform.populate_taxonomies
 transform.cleanup(['places'], ['original_id', 'tags'])
 
+files = [
+  "#{options[:output]}/places.csv",
+  "#{options[:output]}/taxonomies.csv",
+  "#{options[:output]}/relationships.csv"
+]
+
 archive = Archive.new
-archive.create_archive(["#{options[:output]}/places.csv"], options[:output])
+archive.create_archive(files, options[:output])
