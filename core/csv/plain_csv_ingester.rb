@@ -148,11 +148,13 @@ module Csv
 
     # Remove the original_id column, which was needed to
     # build relationships but confuses the CD importer.
-    def cleanup(filenames)
+    def cleanup(filenames, fields = ['original_id'])
       filenames.each do |filename|
         File.open("#{@output_path}/#{filename}.csv", 'w') do |file|
           temp_table = CSV.read("#{@output_path}/temp_#{filename}.csv", headers: true)
-          temp_table.delete('original_id')
+          fields.each do |field|
+            temp_table.delete(field)
+          end
           file.write(temp_table.to_csv)
         end
 
