@@ -96,39 +96,37 @@ module Csv
       end
     end
 
-    def parse_relation(primary, related, primary_model = nil, related_model = nil)
-      primary_table = CSV.read("#{@output_path}/temp_#{primary}.csv", headers: true)
-      related_table = CSV.read("#{@output_path}/temp_#{related}.csv", headers: true)
-      relations = CSV.read("#{@input_path}/#{primary}_#{related}.csv", headers: true)
-
-      primary_id_column = "#{primary}_id"
-      related_id_column = "#{related}_id"
-
-      # Accept model name arguments for cases where the model name is different from the file name
-      primary_model_name = primary_model || "CoreDataConnector::#{primary.singularize.capitalize}"
-      related_model_name = related_model || "CoreDataConnector::#{related.singularize.capitalize}"
-
-      # Get the env variable that the relationship ID is stored in
-      env_var = "PROJECT_MODEL_RELATIONSHIP_ID_#{primary.upcase}_#{related.upcase}"
+    def parse_relation(
+      primary_model:,
+      secondary_model:,
+      primary_csv:,
+      secondary_csv:,
+      relation_csv:,
+      primary_id_column:,
+      secondary_id_column:,
+      project_model_relation_id:,
+      udfs: nil
+    )
+      primary_table = CSV.read(primary_csv, headers: true)
+      related_table = CSV.read(secondary_csv, headers: true)
+      relations_table = CSV.read(relation_csv, headers: true)
 
       CSV.open("#{@output_path}/relationships.csv", 'a') do |csv_out|
-        relations.each do |relation|
+        relations_table.each do |relation|
           matching_primary = primary_table.find { |ed| ed['original_id'] == relation[primary_id_column]}
-          matching_related = related_table.find { |ed| ed['original_id'] == relation[related_id_column]}
+          matching_related = related_table.find { |ed| ed['original_id'] == relation[secondary_id_column]}
 
           if matching_related && matching_primary
             new_relation = {}
-            new_relation['project_model_relationship_id'] = @env[env_var].to_i
+            new_relation['project_model_relationship_id'] = project_model_relation_id.to_i
             new_relation['primary_record_uuid'] = matching_primary['uuid']
-            new_relation['primary_record_type'] = primary_model_name
+            new_relation['primary_record_type'] = primary_model
             new_relation['related_record_uuid'] = matching_related['uuid']
-            new_relation['related_record_type'] = related_model_name
+            new_relation['related_record_type'] = secondary_model
 
-            user_defined_fields = @relation_udfs["#{primary}_#{related}".to_sym]
-
-            if user_defined_fields
-              user_defined_fields.keys.each do |key|
-                new_relation[key] = relation[user_defined_fields[key]]
+            if udfs
+              udfs.keys.each do |key|
+                new_relation[key] = relation[udfs[key]]
               end
             end
 
@@ -138,6 +136,22 @@ module Csv
           end
         end
       end
+    end
+
+    # Most relations are just simple stuff like "items_people". This method automatically
+    # generates the long list of params for parse_relation in those cases.
+    def parse_simple_relation(primary, related, primary_model = nil, related_model = nil)
+      parse_relation(
+        primary_model: primary_model || "CoreDataConnector::#{primary.singularize.capitalize}",
+        secondary_model: related_model || "CoreDataConnector::#{related.singularize.capitalize}",
+        primary_csv: "#{@output_path}/temp_#{primary}.csv",
+        secondary_csv: "#{@output_path}/temp_#{related}.csv",
+        primary_id_column: "#{primary}_id",
+        secondary_id_column: "#{related}_id",
+        relation_csv: "#{@input_path}/#{primary}_#{related}.csv",
+        project_model_relation_id: @env["PROJECT_MODEL_RELATIONSHIP_ID_#{primary.upcase}_#{related.upcase}"],
+        udfs: @relation_udfs ? @relation_udfs["#{primary}_#{related}".to_sym] : nil
+      )
     end
 
     # Keeps us from having to worry about the

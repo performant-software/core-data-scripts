@@ -127,12 +127,12 @@ transform = CsvTransform.new(
 
 transform.init_relationships
 transform.parse_models
-transform.parse_relation('items', 'archives', nil, 'CoreDataConnector::Organization')
+transform.parse_simple_relation('items', 'archives', nil, 'CoreDataConnector::Organization')
 transform.parse_editions_editions
-transform.parse_relation('items', 'people')
-transform.parse_relation('items', 'publishers', nil, 'CoreDataConnector::Organization')
-transform.parse_relation('publishers', 'places', 'CoreDataConnector::Organization')
-transform.parse_relation('archives', 'places', 'CoreDataConnector::Organization')
+transform.parse_simple_relation('items', 'people')
+transform.parse_simple_relation('items', 'publishers', nil, 'CoreDataConnector::Organization')
+transform.parse_simple_relation('publishers', 'places', 'CoreDataConnector::Organization')
+transform.parse_simple_relation('archives', 'places', 'CoreDataConnector::Organization')
 transform.combine_organizations
 transform.cleanup([
   'items',

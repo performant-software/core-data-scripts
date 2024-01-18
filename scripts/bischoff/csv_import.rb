@@ -4,10 +4,6 @@ require 'optparse'
 require_relative '../../core/archive'
 require_relative '../../core/csv/plain_csv_ingester'
 
-class CsvTransform < Csv::PlainCsvIngester
-
-end
-
 env = Dotenv.parse './scripts/bischoff/.env.development'
 
 # Parse input options
@@ -73,7 +69,7 @@ relation_udfs = {
   }
 }
 
-transform = CsvTransform.new(
+transform = Csv::PlainCsvIngester(
   input: options[:input],
   output: options[:output],
   env: env,
@@ -84,11 +80,11 @@ transform = CsvTransform.new(
 
 transform.init_relationships
 transform.parse_models
-transform.parse_relation('items', 'places')
-transform.parse_relation('items', 'works')
-transform.parse_relation('items', 'organizations')
-transform.parse_relation('organizations', 'places')
-transform.parse_relation('works', 'people')
+transform.parse_simple_relation('items', 'places')
+transform.parse_simple_relation('items', 'works')
+transform.parse_simple_relation('items', 'organizations')
+transform.parse_simple_relation('organizations', 'places')
+transform.parse_simple_relation('works', 'people')
 transform.cleanup(model_files)
 
 filepaths = [
