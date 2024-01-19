@@ -86,7 +86,7 @@ module Csv
             csv_out << [
               @env["PROJECT_MODEL_ID_#{filename.upcase}"].to_i,
               id_map[row[@id_column]],
-              *@fields[filename.to_sym].values.map { |val| row[val] ? row[val].gsub(/\A\p{Space}*/, '') : nil },
+              *@fields[filename.to_sym].values.map { |val| row[val] ? row[val] : nil },
               row[@id_column]
             ]
           end

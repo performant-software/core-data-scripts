@@ -33,9 +33,7 @@ fields = {
     'middle_name': nil,
     'biography': nil,
     "udf_#{env['UDF_PEOPLE_TITLE_UUID']}": 'title',
-    "udf_#{env['UDF_PEOPLE_TYPE_UUID']}": 'type',
-    "udf_#{env['UDF_PEOPLE_BIRTH_DATE_UUID']}": 'birth_date',
-    "udf_#{env['UDF_PEOPLE_DEATH_DATE_UUID']}": 'death_date'
+    "udf_#{env['UDF_PEOPLE_TYPE_UUID']}": 'type'
   },
   places: {
     'name': 'name',
@@ -47,14 +45,15 @@ fields = {
     'word': 'word'
   },
   works: {
-    'name': 'name',
+    'name': 'number_order',
+    "udf_#{env['UDF_WORKS_NUMBER_ORDER_UUID']}": 'number_order',
     "udf_#{env['UDF_WORKS_YEAR_UUID']}": 'year',
     "udf_#{env['UDF_WORKS_MONTH_UUID']}": 'month',
     "udf_#{env['UDF_WORKS_DAY_UUID']}": 'day',
     "udf_#{env['UDF_WORKS_SUMMARY_UUID']}": 'summary',
     "udf_#{env['UDF_WORKS_REFERENCES_UUID']}": 'references',
     "udf_#{env['UDF_WORKS_COMMENTS_UUID']}": 'comments',
-    "udf_#{env['UDF_WORKS_TEXT_UUID']}": 'text',
+    "udf_#{env['UDF_WORKS_TEXT_UUID']}": 'texte',
   }
 }
 
@@ -71,6 +70,7 @@ transform.parse_models
 
 transform.parse_simple_relation('works', 'people')
 transform.parse_simple_relation('works', 'places')
+transform.parse_simple_relation('works', 'taxonomies')
 
 transform.parse_relation(
   primary_model: 'CoreDataConnector::Work',
@@ -117,3 +117,10 @@ transform.parse_relation(
 )
 
 transform.cleanup(model_files)
+
+filepaths = [
+  "#{options[:output]}/relationships.csv"
+].concat(model_files.map { |file| "#{options[:output]}/#{file}.csv" })
+
+archive = Archive.new
+archive.create_archive(filepaths, options[:output])
