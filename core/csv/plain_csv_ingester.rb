@@ -10,6 +10,8 @@ module Csv
       input:,
       # The output folder
       output:,
+      # The folder that contains the JSON ID maps
+      id_map_path:,
       # Environment variable object
       env:,
       # Object with lists of fields (see existing scripts for examples)
@@ -23,6 +25,7 @@ module Csv
     )
       @input_path = input
       @output_path = output
+      @id_map_path = id_map_path
       @env = env
       @fields = fields
       @model_files = model_files
@@ -57,7 +60,7 @@ module Csv
     def parse_models
       @model_files.each do |filename|
         temp_file_path = "#{@output_path}/temp_#{filename}.csv"
-        json_file_path = "#{@output_path}/#{filename}_map.json"
+        json_file_path = "#{@id_map_path}/#{filename}_map.json"
 
         mapper = IdMapper.new(
           csv_path: temp_file_path,

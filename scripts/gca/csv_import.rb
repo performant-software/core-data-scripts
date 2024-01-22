@@ -6,7 +6,7 @@ require 'securerandom'
 require_relative '../../core/archive'
 require_relative '../../core/csv/plain_csv_ingester'
 
-class CsvTransform < Csv::PlainCsvIngester
+class GcaTransform < Csv::PlainCsvIngester
   def populate_taxonomies
     places = CSV.read("#{@output_path}/temp_places.csv", headers: true)
     taxonomy_hash = {}
@@ -50,73 +50,66 @@ class CsvTransform < Csv::PlainCsvIngester
   end
 end
 
-# The canonical way of computing the name of the env
-# variable for a given field name so we don't have
-# to type them all out over and over.
-def get_udf_key(field_name)
-  "UDF_#{field_name.upcase.gsub(/[^\w]/, '_')}"
-end
+def parse_gca
+  input = File.expand_path('input/gca')
+  output = File.expand_path('output/gca')
 
-# Parse environment variables
-env = Dotenv.parse './scripts/gca/.env.development'
+  # The canonical way of computing the name of the env
+  # variable for a given field name so we don't have
+  # to type them all out over and over.
+  def get_udf_key(field_name)
+    "UDF_#{field_name.upcase.gsub(/[^\w]/, '_')}"
+  end
 
-# Parse input options
-options = {}
+  # Parse environment variables
+  env = Dotenv.parse './scripts/gca/.env.development'
 
-OptionParser.new do |opts|
-  opts.on '-i INPUT', '--input INPUT', 'Input directory'
-  opts.on '-o OUTPUT', '--output OUTPUT', 'Output directory'
-end.parse!(into: options)
+  model_files = ['places']
 
-unless options[:input] && options[:output]
-  puts 'Input and output directory paths are required in arguments.'
-  exit 1
-end
+  column_names = [
+    'Item Id',
+    'Dublin Core:Description',
+    'Dublin Core:Type',
+    'Dublin Core:Identifier',
+    'Item Type Metadata:TopoName',
+    'Item Type Metadata:URL'
+  ]
 
-model_files = ['places']
-
-column_names = [
-  'Item Id',
-  'Dublin Core:Description',
-  'Dublin Core:Type',
-  'Dublin Core:Identifier',
-  'Item Type Metadata:TopoName',
-  'Item Type Metadata:URL'
-]
-
-fields = {
-  places: {
-    'name': 'Dublin Core:Title',
-    'latitude': 'Item Type Metadata:geolocation:latitude',
-    'longitude': 'Item Type Metadata:geolocation:longitude',
-    'tags': 'tags'
+  fields = {
+    places: {
+      'name': 'Dublin Core:Title',
+      'latitude': 'Item Type Metadata:geolocation:latitude',
+      'longitude': 'Item Type Metadata:geolocation:longitude',
+      'tags': 'tags'
+    }
   }
-}
 
-# Fill the fields.places object with more
-column_names.each do |col|
-  fields[:places]["udf_#{env[get_udf_key(col)]}"] = col
+  # Fill the fields.places object with more
+  column_names.each do |col|
+    fields[:places]["udf_#{env[get_udf_key(col)]}"] = col
+  end
+
+  # Run the importer
+  transform = GcaTransform.new(
+    input: input,
+    output: output,
+    id_map_path: File.expand_path('./id_maps/gca'),
+    env: env,
+    fields: fields,
+    model_files: model_files,
+    id_column: 'Item Id'
+  )
+
+  transform.parse_models
+  transform.populate_taxonomies
+  transform.cleanup(['places'], ['original_id', 'tags'])
+
+  files = [
+    "#{output}/places.csv",
+    "#{output}/taxonomies.csv",
+    "#{output}/relationships.csv"
+  ]
+
+  archive = Archive.new
+  archive.create_archive(files, output)
 end
-
-# Run the importer
-transform = CsvTransform.new(
-  input: options[:input],
-  output: options[:output],
-  env: env,
-  fields: fields,
-  model_files: model_files,
-  id_column: 'Item Id'
-)
-
-transform.parse_models
-transform.populate_taxonomies
-transform.cleanup(['places'], ['original_id', 'tags'])
-
-files = [
-  "#{options[:output]}/places.csv",
-  "#{options[:output]}/taxonomies.csv",
-  "#{options[:output]}/relationships.csv"
-]
-
-archive = Archive.new
-archive.create_archive(files, options[:output])

@@ -52,104 +52,97 @@ class CsvTransform < Csv::PlainCsvIngester
   end
 end
 
-env = Dotenv.parse './scripts/rumpf/.env.development'
+def parse_rumpf
+  input = File.expand_path('input/rumpf')
+  output = File.expand_path('output/rumpf')
 
-# Parse input options
-options = {}
+  env = Dotenv.parse './scripts/rumpf/.env.development'
 
-OptionParser.new do |opts|
-  opts.on '-i INPUT', '--input INPUT', 'Input directory'
-  opts.on '-o OUTPUT', '--output OUTPUT', 'Output directory'
-end.parse!(into: options)
+  model_files = [
+    'archives',
+    'items',
+    'people',
+    'places',
+    'publishers',
+    'works'
+  ]
 
-unless options[:input] && options[:output]
-  puts 'Input and output directory paths are required in arguments.'
-  exit 1
-end
-
-model_files = [
-  'archives',
-  'items',
-  'people',
-  'places',
-  'publishers',
-  'works'
-]
-
-fields = {
-  archives: {
-    'name': 'name',
-    'description': nil
-  },
-  items: {
-    'name': 'title',
-    "udf_#{env['UDF_EDITIONS_NOTES_UUID']}": 'notes',
-    "udf_#{env['UDF_EDITIONS_TYPE_UUID']}": 'type',
-    "udf_#{env['UDF_EDITIONS_FORMAT_UUID']}": 'format',
-    "udf_#{env['UDF_EDITIONS_LINE_UUID']}": 'line',
-    "udf_#{env['UDF_EDITIONS_BNF_UUID']}": 'bnf',
-    "udf_#{env['UDF_EDITIONS_DPLA_UUID']}": 'dpla',
-    "udf_#{env['UDF_EDITIONS_JISC_UUID']}": 'jisc',
-    "udf_#{env['UDF_EDITIONS_PUBLICATION_DATE_UUID']}": 'publication_date'
-  },
-  people: {
-    'last_name': nil,
-    'first_name': 'full_name',
-    'middle_name': nil,
-    'biography': nil,
-    "udf_#{env['UDF_PEOPLE_VIAF_UUID']}": 'viaf',
-    "udf_#{env['UDF_PEOPLE_WIKIDATA_UUID']}": 'wikidata'
-  },
-  places: {
-    'name': 'name',
-    'latitude': nil,
-    'longitude': nil,
-    "udf_#{env['UDF_PLACES_VIAF_UUID']}": 'viaf',
-    "udf_#{env['UDF_PLACES_WIKIDATA_UUID']}": 'wikidata'
-  },
-  publishers: {
-    'name': 'name',
-    'description': nil
-  },
-  works: {
-    'name': 'name',
-    "udf_#{env['UDF_WORKS_STATUS_UUID']}": 'status'
+  fields = {
+    archives: {
+      'name': 'name',
+      'description': nil
+    },
+    items: {
+      'name': 'title',
+      "udf_#{env['UDF_EDITIONS_NOTES_UUID']}": 'notes',
+      "udf_#{env['UDF_EDITIONS_TYPE_UUID']}": 'type',
+      "udf_#{env['UDF_EDITIONS_FORMAT_UUID']}": 'format',
+      "udf_#{env['UDF_EDITIONS_LINE_UUID']}": 'line',
+      "udf_#{env['UDF_EDITIONS_BNF_UUID']}": 'bnf',
+      "udf_#{env['UDF_EDITIONS_DPLA_UUID']}": 'dpla',
+      "udf_#{env['UDF_EDITIONS_JISC_UUID']}": 'jisc',
+      "udf_#{env['UDF_EDITIONS_PUBLICATION_DATE_UUID']}": 'publication_date'
+    },
+    people: {
+      'last_name': nil,
+      'first_name': 'full_name',
+      'middle_name': nil,
+      'biography': nil,
+      "udf_#{env['UDF_PEOPLE_VIAF_UUID']}": 'viaf',
+      "udf_#{env['UDF_PEOPLE_WIKIDATA_UUID']}": 'wikidata'
+    },
+    places: {
+      'name': 'name',
+      'latitude': nil,
+      'longitude': nil,
+      "udf_#{env['UDF_PLACES_VIAF_UUID']}": 'viaf',
+      "udf_#{env['UDF_PLACES_WIKIDATA_UUID']}": 'wikidata'
+    },
+    publishers: {
+      'name': 'name',
+      'description': nil
+    },
+    works: {
+      'name': 'name',
+      "udf_#{env['UDF_WORKS_STATUS_UUID']}": 'status'
+    }
   }
-}
 
-transform = CsvTransform.new(
-  input: options[:input],
-  output: options[:output],
-  env: env,
-  fields: fields,
-  model_files: model_files
-)
+  transform = CsvTransform.new(
+    input: input,
+    output: output,
+    id_map_path: File.expand_path('./id_maps/rumpf'),
+    env: env,
+    fields: fields,
+    model_files: model_files
+  )
 
-transform.init_relationships
-transform.parse_models
-transform.parse_simple_relation('items', 'archives', nil, 'CoreDataConnector::Organization')
-transform.parse_editions_editions
-transform.parse_simple_relation('items', 'people')
-transform.parse_simple_relation('items', 'publishers', nil, 'CoreDataConnector::Organization')
-transform.parse_simple_relation('publishers', 'places', 'CoreDataConnector::Organization')
-transform.parse_simple_relation('archives', 'places', 'CoreDataConnector::Organization')
-transform.combine_organizations
-transform.cleanup([
-  'items',
-  'organizations',
-  'people',
-  'places',
-  'works'
-])
+  transform.init_relationships
+  transform.parse_models
+  transform.parse_simple_relation('items', 'archives', nil, 'CoreDataConnector::Organization')
+  transform.parse_editions_editions
+  transform.parse_simple_relation('items', 'people')
+  transform.parse_simple_relation('items', 'publishers', nil, 'CoreDataConnector::Organization')
+  transform.parse_simple_relation('publishers', 'places', 'CoreDataConnector::Organization')
+  transform.parse_simple_relation('archives', 'places', 'CoreDataConnector::Organization')
+  transform.combine_organizations
+  transform.cleanup([
+    'items',
+    'organizations',
+    'people',
+    'places',
+    'works'
+  ])
 
-filepaths = [
-  "#{options[:output]}/items.csv",
-  "#{options[:output]}/organizations.csv",
-  "#{options[:output]}/people.csv",
-  "#{options[:output]}/places.csv",
-  "#{options[:output]}/relationships.csv",
-  "#{options[:output]}/works.csv"
-]
+  filepaths = [
+    "#{output}/items.csv",
+    "#{output}/organizations.csv",
+    "#{output}/people.csv",
+    "#{output}/places.csv",
+    "#{output}/relationships.csv",
+    "#{output}/works.csv"
+  ]
 
-archive = Archive.new
-archive.create_archive(filepaths, options[:output])
+  archive = Archive.new
+  archive.create_archive(filepaths, output)
+end
