@@ -78,9 +78,9 @@ def parse_rumpf
       "udf_#{env['UDF_EDITIONS_TYPE_UUID']}": 'type',
       "udf_#{env['UDF_EDITIONS_FORMAT_UUID']}": 'format',
       "udf_#{env['UDF_EDITIONS_LINE_UUID']}": 'line',
-      "udf_#{env['UDF_EDITIONS_BNF_UUID']}": 'bnf',
-      "udf_#{env['UDF_EDITIONS_DPLA_UUID']}": 'dpla',
-      "udf_#{env['UDF_EDITIONS_JISC_UUID']}": 'jisc',
+      'bnf': 'bnf',
+      'dpla': 'dpla',
+      'jisc': 'jisc',
       "udf_#{env['UDF_EDITIONS_PUBLICATION_DATE_UUID']}": 'publication_date'
     },
     people: {
@@ -88,15 +88,15 @@ def parse_rumpf
       'first_name': 'full_name',
       'middle_name': nil,
       'biography': nil,
-      "udf_#{env['UDF_PEOPLE_VIAF_UUID']}": 'viaf',
-      "udf_#{env['UDF_PEOPLE_WIKIDATA_UUID']}": 'wikidata'
+      'viaf': 'viaf',
+      'wikidata': 'wikidata'
     },
     places: {
       'name': 'name',
       'latitude': nil,
       'longitude': nil,
-      "udf_#{env['UDF_PLACES_VIAF_UUID']}": 'viaf',
-      "udf_#{env['UDF_PLACES_WIKIDATA_UUID']}": 'wikidata'
+      'viaf': 'viaf',
+      'wikidata': 'wikidata'
     },
     publishers: {
       'name': 'name',
@@ -117,7 +117,6 @@ def parse_rumpf
     model_files: model_files
   )
 
-  transform.init_relationships
   transform.parse_models
   transform.parse_simple_relation('items', 'archives', nil, 'CoreDataConnector::Organization')
   transform.parse_editions_editions
@@ -125,6 +124,15 @@ def parse_rumpf
   transform.parse_simple_relation('items', 'publishers', nil, 'CoreDataConnector::Organization')
   transform.parse_simple_relation('publishers', 'places', 'CoreDataConnector::Organization')
   transform.parse_simple_relation('archives', 'places', 'CoreDataConnector::Organization')
+
+  transform.parse_web_authority('items', 'bnf')
+  transform.parse_web_authority('items', 'dpla')
+  transform.parse_web_authority('items', 'jisc')
+  transform.parse_web_authority('people', 'viaf')
+  transform.parse_web_authority('people', 'wikidata')
+  transform.parse_web_authority('places', 'viaf')
+  transform.parse_web_authority('places', 'wikidata')
+
   transform.combine_organizations
   transform.cleanup([
     'items',
@@ -135,6 +143,7 @@ def parse_rumpf
   ])
 
   filepaths = [
+    "#{output}/external_identifiers.csv",
     "#{output}/items.csv",
     "#{output}/organizations.csv",
     "#{output}/people.csv",
