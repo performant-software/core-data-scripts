@@ -125,13 +125,46 @@ def parse_rumpf
   transform.parse_simple_relation('publishers', 'places', 'CoreDataConnector::Organization')
   transform.parse_simple_relation('archives', 'places', 'CoreDataConnector::Organization')
 
-  transform.parse_web_authority('items', 'bnf')
-  transform.parse_web_authority('items', 'dpla')
-  transform.parse_web_authority('items', 'jisc')
-  transform.parse_web_authority('people', 'viaf')
-  transform.parse_web_authority('people', 'wikidata')
-  transform.parse_web_authority('places', 'viaf')
-  transform.parse_web_authority('places', 'wikidata')
+  bnf_regex = /(?<=\/\/catalogue\.bnf\.fr\/ark:\/12148\/).*/
+  jisc_regex = /(?<=discover\.libraryhub\.jisc\.ac\.uk\/search\?id=).\d*/
+  viaf_regex = /(?<=viaf\.org\/viaf\/).*/
+  wikidata_regex = /(?<=wikidata\.org\/wiki\/|entity\/).*/
+
+  transform.parse_web_authority(
+    model: 'items',
+    column: 'bnf',
+    regex: bnf_regex
+  )
+
+  transform.parse_web_authority(
+    model: 'items',
+    column: 'jisc',
+    regex: jisc_regex
+  )
+
+  transform.parse_web_authority(
+    model: 'people',
+    column: 'viaf',
+    regex: viaf_regex
+  )
+
+  transform.parse_web_authority(
+    model: 'people',
+    column: 'wikidata',
+    regex: wikidata_regex
+  )
+
+  transform.parse_web_authority(
+    model: 'places',
+    column: 'viaf',
+    regex: viaf_regex
+  )
+
+  transform.parse_web_authority(
+    model: 'places',
+    column: 'wikidata',
+    regex: wikidata_regex
+  )
 
   transform.combine_organizations
   transform.cleanup([
@@ -143,7 +176,7 @@ def parse_rumpf
   ])
 
   filepaths = [
-    "#{output}/external_identifiers.csv",
+    "#{output}/web_identifiers.csv",
     "#{output}/items.csv",
     "#{output}/organizations.csv",
     "#{output}/people.csv",

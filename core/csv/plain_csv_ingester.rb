@@ -32,6 +32,12 @@ module Csv
       @relation_udfs = relation_udfs
       @id_column = id_column
 
+      if File.directory?(@output_path)
+        FileUtils.remove_dir(@output_path)
+      end
+
+      Dir.mkdir(@output_path)
+
       @relationship_headers = [
         'project_model_relationship_id',
         'primary_record_uuid',
@@ -169,7 +175,7 @@ module Csv
       @relationship_headers.map { |field| relation_obj[field] }
     end
 
-    def init_external_identifiers(external_identifiers_path)
+    def init_web_identifiers(web_identifiers_path)
       headers = [
         'web_authority_id',
         'identifiable_uuid',
@@ -178,27 +184,38 @@ module Csv
       ]
 
       File.write(
-        external_identifiers_path,
+        web_identifiers_path,
         "#{headers.join(',')}\n"
       )
     end
 
-    def parse_web_authority(model, column, authority_id = nil, core_data_model = nil)
+    def parse_web_authority(
+      # Name of the model, e.g. 'places'
+      model:,
+      # Name of the CSV column from which the IDs are being taken
+      column:,
+      # The ID of the authority in Core Data
+      authority_id: nil,
+      # The model being ingested (i.e. 'CoreDataConnector::Place')
+      core_data_model: nil,
+      # regex pattern for matching the ID within a longer string
+      regex: nil
+    )
       table = CSV.read("#{@output_path}/temp_#{model}.csv", headers: true)
-      external_identifiers_path = "#{@output_path}/external_identifiers.csv"
+      web_identifiers_path = "#{@output_path}/web_identifiers.csv"
 
-      unless File.exist?(external_identifiers_path)
-        init_external_identifiers(external_identifiers_path)
+      unless File.exist?(web_identifiers_path)
+        init_web_identifiers(web_identifiers_path)
       end
 
-      CSV.open(external_identifiers_path, 'a') do |csv_out|
+      CSV.open(web_identifiers_path, 'a') do |csv_out|
         table.each do |record|
           if record[column] && record[column] != ''
             csv_out << [
               authority_id || @env["#{column.upcase}_AUTHORITY_ID"],
               record['uuid'],
               core_data_model || "CoreDataConnector::#{model.singularize.capitalize}",
-              record[column]
+              regex ? record[column][regex] : record[column]
             ]
           end
         end
