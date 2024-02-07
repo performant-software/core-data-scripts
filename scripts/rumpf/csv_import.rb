@@ -121,6 +121,7 @@ def parse_rumpf
   transform.parse_simple_relation('items', 'archives', nil, 'CoreDataConnector::Organization')
   transform.parse_editions_editions
   transform.parse_simple_relation('items', 'people')
+  transform.parse_simple_relation('items', 'places')
   transform.parse_simple_relation('items', 'publishers', nil, 'CoreDataConnector::Organization')
   transform.parse_simple_relation('publishers', 'places', 'CoreDataConnector::Organization')
   transform.parse_simple_relation('archives', 'places', 'CoreDataConnector::Organization')
