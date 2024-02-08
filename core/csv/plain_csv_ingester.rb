@@ -21,7 +21,9 @@ module Csv
       # Object with lists of user-defined fields on relations (see existing scripts for examples)
       relation_udfs: nil,
       # Name of the column in the input CSV(s) that contains the remote ID
-      id_column: 'id'
+      id_column: 'id',
+      # Name of the column to read from for the ID map feature
+      id_map_column: 'id'
     )
       @input_path = input
       @output_path = output
@@ -31,6 +33,7 @@ module Csv
       @model_files = model_files
       @relation_udfs = relation_udfs
       @id_column = id_column
+      @id_map_column = id_map_column
 
       if File.directory?(@output_path)
         FileUtils.remove_dir(@output_path)
@@ -70,8 +73,7 @@ module Csv
 
         mapper = IdMapper.new(
           csv_path: temp_file_path,
-          json_path: json_file_path,
-          id_column: @id_column
+          json_path: json_file_path
         )
 
         id_map = mapper.get_hashmap
@@ -88,14 +90,31 @@ module Csv
           ]
 
           table.each do |row|
-            unless id_map[row[@id_column]]
-              id_map[row[@id_column]] = SecureRandom.uuid
+            unless id_map[row[@id_map_column]]
+              # If the source DB already has UUIDs, we can just use those.
+              if row['uuid']
+                id_map[row[@id_map_column]] = row['uuid']
+              else
+                id_map[row[@id_map_column]] = SecureRandom.uuid
+              end
+            end
+
+            model_fields = @fields[filename.to_sym].values.map do |val|
+              result = nil
+
+              if val.class == Proc
+                result = val.call(row) || nil
+              elsif val.class == String
+                result = row[val] || nil
+              end
+
+              result
             end
 
             csv_out << [
               @env["PROJECT_MODEL_ID_#{filename.upcase}"].to_i,
-              id_map[row[@id_column]],
-              *@fields[filename.to_sym].values.map { |val| row[val] ? row[val] : nil },
+              id_map[row[@id_map_column]],
+              *model_fields,
               row[@id_column]
             ]
           end

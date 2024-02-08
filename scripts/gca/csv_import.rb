@@ -97,7 +97,8 @@ def parse_gca
     env: env,
     fields: fields,
     model_files: model_files,
-    id_column: 'Item Id'
+    id_column: 'Item Id',
+    id_map_column: 'Item Id'
   )
 
   transform.parse_models

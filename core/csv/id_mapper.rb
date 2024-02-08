@@ -2,10 +2,9 @@ require 'json'
 
 module Csv
   class IdMapper
-    def initialize(csv_path:, json_path:, id_column:)
+    def initialize(csv_path:, json_path:)
       @csv_path = csv_path
       @json_path = json_path
-      @id_column = id_column
     end
 
     def get_hashmap

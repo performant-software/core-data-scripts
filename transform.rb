@@ -4,6 +4,7 @@ require 'optparse'
 
 require_relative './scripts/bischoff/csv_import.rb'
 require_relative './scripts/gca/csv_import.rb'
+require_relative './scripts/nbu/csv_import.rb'
 require_relative './scripts/rumpf/csv_import.rb'
 require_relative './scripts/supplique/csv_import.rb'
 
@@ -36,6 +37,8 @@ def main
     parse_rumpf
   when 'bischoff'
     parse_bischoff
+  when 'nbu'
+    parse_nbu
   else
     puts 'No matching project found.'
     exit 1
