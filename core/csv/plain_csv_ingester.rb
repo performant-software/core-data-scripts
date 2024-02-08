@@ -32,6 +32,12 @@ module Csv
       @relation_udfs = relation_udfs
       @id_column = id_column
 
+      if File.directory?(@output_path)
+        FileUtils.remove_dir(@output_path)
+      end
+
+      Dir.mkdir(@output_path)
+
       @relationship_headers = [
         'project_model_relationship_id',
         'primary_record_uuid',
@@ -50,9 +56,9 @@ module Csv
     end
 
     # Set up the relationships file
-    def init_relationships
+    def init_relationships(relationships_path)
       File.write(
-        "#{@output_path}/relationships.csv",
+        relationships_path,
         "#{@relationship_headers.join(',')}\n"
       )
     end
@@ -110,6 +116,12 @@ module Csv
       project_model_relation_id:,
       udfs: nil
     )
+      relationships_path = "#{@output_path}/relationships.csv"
+
+      unless File.exist?(relationships_path)
+        init_relationships(relationships_path)
+      end
+  
       primary_table = CSV.read(primary_csv, headers: true)
       related_table = CSV.read(secondary_csv, headers: true)
       relations_table = CSV.read(relation_csv, headers: true)
@@ -163,15 +175,73 @@ module Csv
       @relationship_headers.map { |field| relation_obj[field] }
     end
 
+    def init_web_identifiers(web_identifiers_path)
+      headers = [
+        'web_authority_id',
+        'identifiable_uuid',
+        'identifiable_type',
+        'identifier'
+      ]
+
+      File.write(
+        web_identifiers_path,
+        "#{headers.join(',')}\n"
+      )
+    end
+
+    def parse_web_authority(
+      # Name of the model, e.g. 'places'
+      model:,
+      # Name of the CSV column from which the IDs are being taken
+      column:,
+      # The ID of the authority in Core Data
+      authority_id: nil,
+      # The model being ingested (i.e. 'CoreDataConnector::Place')
+      core_data_model: nil,
+      # regex pattern for matching the ID within a longer string
+      regex: nil
+    )
+      table = CSV.read("#{@output_path}/temp_#{model}.csv", headers: true)
+      web_identifiers_path = "#{@output_path}/web_identifiers.csv"
+
+      unless File.exist?(web_identifiers_path)
+        init_web_identifiers(web_identifiers_path)
+      end
+
+      CSV.open(web_identifiers_path, 'a') do |csv_out|
+        table.each do |record|
+          if record[column] && record[column] != ''
+            csv_out << [
+              authority_id || @env["#{column.upcase}_AUTHORITY_ID"],
+              record['uuid'],
+              core_data_model || "CoreDataConnector::#{model.singularize.capitalize}",
+              regex ? record[column][regex] : record[column]
+            ]
+          end
+        end
+      end
+    end
+
     # Remove the original_id column, which was needed to
     # build relationships but confuses the CD importer.
-    def cleanup(filenames, fields = ['original_id'])
+    def cleanup(filenames, fields_to_remove = nil)
+      fields = fields_to_remove || [
+        'bnf',
+        'dpla',
+        'jisc',
+        'original_id',
+        'viaf',
+        'wikidata'
+      ]
+
       filenames.each do |filename|
         File.open("#{@output_path}/#{filename}.csv", 'w') do |file|
           temp_table = CSV.read("#{@output_path}/temp_#{filename}.csv", headers: true)
+
           fields.each do |field|
             temp_table.delete(field)
           end
+
           file.write(temp_table.to_csv)
         end
 

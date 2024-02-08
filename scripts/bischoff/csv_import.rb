@@ -70,7 +70,6 @@ def parse_bischoff
     relation_udfs: relation_udfs
   )
 
-  transform.init_relationships
   transform.parse_models
   transform.parse_simple_relation('items', 'places')
   transform.parse_simple_relation('items', 'works')

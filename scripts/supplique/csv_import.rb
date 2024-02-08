@@ -56,7 +56,6 @@ def parse_supplique
     model_files: model_files
   )
 
-  transform.init_relationships
   transform.parse_models
 
   transform.parse_simple_relation('works', 'people')
