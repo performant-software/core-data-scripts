@@ -1,10 +1,10 @@
 require 'active_support/core_ext/string/filters'
-require 'dotenv'
 require 'json'
 require 'optparse'
 
 require_relative '../../core/csv/multi_adapter'
 require_relative '../../core/archive'
+require_relative '../../core/env'
 
 class CsvImport < Csv::MultiAdapter
   attr_reader :columns
@@ -718,9 +718,6 @@ class CsvImport < Csv::MultiAdapter
   end
 end
 
-# Parse environment variables
-env = Dotenv.parse './scripts/company_towns/.env.development'
-
 # Parse input options
 options = {}
 
@@ -729,7 +726,12 @@ OptionParser.new do |opts|
   opts.on '-u USER', '--user USER', 'Database username'
   opts.on '-i INPUT', '--input INPUT', 'Input directory'
   opts.on '-o OUTPUT', '--output OUTPUT', 'Output directory'
+  opts.on '-e ENV', '--environment ENV', 'Environment'
 end.parse!(into: options)
+
+# Parse environment variables
+env_manager = Env.new
+env = env_manager.initialize_env('./scripts/company_towns', options[:environment])
 
 # Run the importer
 import = CsvImport.new(
