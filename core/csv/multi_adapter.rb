@@ -74,6 +74,8 @@ module Csv
       files = []
 
       Dir.children(dir).each do |file_name|
+        next unless File.extname(file_name) == '.csv'
+
         file_path = File.join(dir, file_name)
         table_name = File.basename(file_name, '.csv').downcase.gsub(' ', '_')
 
