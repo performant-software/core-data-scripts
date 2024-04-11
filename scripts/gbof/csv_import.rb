@@ -4,6 +4,7 @@ require 'optparse'
 
 require_relative '../../core/csv/adapter'
 require_relative '../../core/archive'
+require_relative '../../core/env'
 
 class CsvImport < Csv::Adapter
   def cleanup
@@ -59,8 +60,7 @@ class CsvImport < Csv::Adapter
              uuid, 
              name, 
              latitude, 
-             longitude,
-             #{user_defined_column('PLACE_ADDRESS_UUID')}
+             longitude
         FROM z_places
        ORDER BY name
     SQL
@@ -115,8 +115,7 @@ class CsvImport < Csv::Adapter
         project_model_id INTEGER,
         name VARCHAR,
         latitude DECIMAL,
-        longitude DECIMAL,
-        #{user_defined_column('PLACE_ADDRESS_UUID')} VARCHAR
+        longitude DECIMAL
       )
     SQL
 
@@ -182,11 +181,12 @@ class CsvImport < Csv::Adapter
     SQL
 
     execute <<-SQL.squish
-      INSERT INTO z_places ( project_model_id, name, latitude, longitude, #{user_defined_column('PLACE_ADDRESS_UUID')} )
-      SELECT #{env['PROJECT_MODEL_ID_PLACES'].to_i}, name, latitude, longitude, address
+      INSERT INTO z_places ( project_model_id, name, latitude, longitude )
+      SELECT #{env['PROJECT_MODEL_ID_PLACES'].to_i}, address, latitude, longitude
         FROM #{table_name}
-       WHERE ( address IS NOT NULL AND TRIM(address) != '' )
-          OR ( latitude IS NOT NULL AND longitude IS NOT NULL )
+       WHERE address IS NOT NULL 
+         AND TRIM(address) != ''
+       GROUP BY address, latitude, longitude
     SQL
 
     execute <<-SQL
@@ -231,7 +231,7 @@ class CsvImport < Csv::Adapter
              'CoreDataConnector::Place'
         FROM #{table_name} z_temp
         JOIN z_organizations ON z_organizations.name = z_temp.name
-        JOIN z_places ON z_places.name = z_temp.name
+        JOIN z_places ON z_places.name = z_temp.address
     SQL
   end
 
@@ -284,9 +284,6 @@ class CsvImport < Csv::Adapter
   end
 end
 
-# Parse environment variables
-env = Dotenv.parse './scripts/gbof/.env.development'
-
 # Parse input options
 options = {}
 
@@ -295,7 +292,12 @@ OptionParser.new do |opts|
   opts.on '-u USER', '--user USER', 'Database username'
   opts.on '-f FILE', '--file FILE', 'Source filepath'
   opts.on '-o OUTPUT', '--output OUTPUT', 'Output directory'
+  opts.on '-e ENV', '--environment ENV', 'Environment'
 end.parse!(into: options)
+
+# Parse environment variables
+env_manager = Env.new
+env = env_manager.initialize_env('./scripts/gbof', options[:environment])
 
 # Run the importer
 import = CsvImport.new(
