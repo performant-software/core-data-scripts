@@ -5,7 +5,7 @@ module Csv
   class Adapter
     attr_reader :connection, :filepath, :output_path, :env
 
-    def initialize(database:, user:, filepath:, output:, env:)
+    def initialize(database:, user:, filepath: nil, output:, env:)
       @connection = PG.connect(dbname: database, user: user)
       @filepath = filepath
       @output_path = output
