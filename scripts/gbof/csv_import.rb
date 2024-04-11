@@ -4,6 +4,7 @@ require 'optparse'
 
 require_relative '../../core/csv/adapter'
 require_relative '../../core/archive'
+require_relative '../../core/env'
 
 class CsvImport < Csv::Adapter
   def cleanup
@@ -283,9 +284,6 @@ class CsvImport < Csv::Adapter
   end
 end
 
-# Parse environment variables
-env = Dotenv.parse './scripts/gbof/.env.development'
-
 # Parse input options
 options = {}
 
@@ -294,7 +292,12 @@ OptionParser.new do |opts|
   opts.on '-u USER', '--user USER', 'Database username'
   opts.on '-f FILE', '--file FILE', 'Source filepath'
   opts.on '-o OUTPUT', '--output OUTPUT', 'Output directory'
+  opts.on '-e ENV', '--environment ENV', 'Environment'
 end.parse!(into: options)
+
+# Parse environment variables
+env_manager = Env.new
+env = env_manager.initialize_env('./scripts/gbof', options[:environment])
 
 # Run the importer
 import = CsvImport.new(
