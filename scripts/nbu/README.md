@@ -1,9 +1,5 @@
 # NBU Script Readme
 
-## General Structure
-
-I consider NBU's documents to be Works, as opposed to Instances or Items. It's not a hugely important distinction at the moment, but the fact that documents are specific, unique, hand-written papers seems to align with the Works model the most.
-
 ## User-defined fields
 
 Since user-defined fields are stored in a `user_defined` `jsonb` column, we need to use a special query that looks like:
@@ -49,6 +45,9 @@ The other low-value-count ones won't take a ton of time but I'd still rather avo
 
 ## Relations
 
+* events_people
+* events_places
+* documents_events
 * documents_people
 * documents_places
 * people_people (family relations)

@@ -110,10 +110,11 @@ def parse_nbu
   env = Dotenv.parse './scripts/nbu/.env.development'
 
   model_files = [
+    'events',
+    'items',
     'people',
     'places',
-    'taxonomies',
-    'works'
+    'taxonomies'
   ]
 
   # In the NBU CMS, gender is an enum, so its values are 0 or 1.
@@ -128,12 +129,28 @@ def parse_nbu
   end
 
   fields = {
+    events: {
+      'name': 'name',
+      'description': 'description',
+      'start_date': 'start_date',
+      'start_date_description': 'date_description',
+      'end_date': 'end_date',
+      'end_date_description': nil,
+      "udf_#{env['UDF_EVENTS_TYPE_UUID']}": 'type'
+    },
+    items: {
+      'name': 'title',
+      "udf_#{env['UDF_ITEMS_ARCHIVENGINE_ID_UUID']}": 'archivengine_id'
+    },
     people: {
       'last_name': nil,
       'first_name': 'display_name',
       'middle_name': nil,
       'biography': nil,
-      "udf_#{env['UDF_PEOPLE_GENDER_UUID']}": Proc.new { |person| transform_gender(person) }
+      "udf_#{env['UDF_PEOPLE_GENDER_UUID']}": Proc.new { |person| transform_gender(person) },
+      "udf_#{env['UDF_PEOPLE_APPROXIMATE_BIRTH_YEAR_UUID']}": 'approximate_birth_year',
+      "udf_#{env['UDF_PEOPLE_STATUS_UUID']}": 'status',
+      "udf_#{env['UDF_PEOPLE_OCCUPATION_UUID']}": 'occupation'
     },
     places: {
       'name': 'name',
@@ -142,19 +159,21 @@ def parse_nbu
     },
     taxonomies: {
       'name': 'name'
-    },
-    works: {
-      'name': 'title',
-      "udf_#{env['UDF_WORKS_ARCHIVENGINE_ID_UUID']}": 'archivengine_id'
-    },
+    }
   }
 
   relation_udfs = {
-    works_people: {
-      "udf_#{env['UDF_WORKS_PEOPLE_XML_ID_UUID']}": 'xml_id'
+    documents_events: {
+      "udf_#{env['UDF_DOCUMENTS_EVENTS_XML_ID_UUID']}": 'xml_id'
     },
-    works_places: {
-      "udf_#{env['UDF_WORKS_PLACES_XML_ID_UUID']}": 'xml_id'
+    events_people: {
+      "udf_#{env['UDF_EVENTS_PEOPLE_TYPE_UUID']}": 'type'
+    },
+    items_people: {
+      "udf_#{env['UDF_ITEMS_PEOPLE_XML_ID_UUID']}": 'xml_id'
+    },
+    items_places: {
+      "udf_#{env['UDF_ITEMS_PLACES_XML_ID_UUID']}": 'xml_id'
     }
   }
 
@@ -172,27 +191,31 @@ def parse_nbu
 
   transform.parse_models
 
-  transform.parse_simple_relation('people', 'taxonomies')
-  transform.parse_simple_relation('works', 'people')
-  transform.parse_simple_relation('works', 'places')
+  transform.parse_simple_relation('events', 'people')
+  transform.parse_simple_relation('events', 'places')
+  transform.parse_simple_relation('items', 'people')
+  transform.parse_simple_relation('items', 'places')
+  transform.parse_simple_relation('taxonomies', 'people')
 
   transform.parse_enslavements
   transform.parse_family_relations
   transform.parse_people_places
 
   transform.cleanup([
+    'events',
+    'items',
     'people',
     'places',
-    'taxonomies',
-    'works'
+    'taxonomies'
   ])
 
   files = [
+    "#{output}/events.csv",
+    "#{output}/items.csv",
     "#{output}/people.csv",
     "#{output}/places.csv",
     "#{output}/relationships.csv",
-    "#{output}/taxonomies.csv",
-    "#{output}/works.csv"
+    "#{output}/taxonomies.csv"
   ]
 
   archive = Archive.new
