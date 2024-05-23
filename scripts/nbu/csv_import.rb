@@ -2,6 +2,7 @@ require 'csv'
 require 'dotenv'
 require 'optparse'
 require 'securerandom'
+require 'json'
 
 require_relative '../../core/archive'
 require_relative '../../core/csv/plain_csv_ingester'
@@ -128,6 +129,43 @@ def parse_nbu
     end
   end
 
+  # Normalize the different possible values for enslavement status into
+  # just two: `Enslaved` and `Enslaver`. They are not mutually exclusive.
+  def transform_status(person)
+    if !person['status']
+      return nil
+    end
+
+    parsed = JSON.parse(person['status'])
+
+    if !parsed.count || parsed.count == 0
+      return nil
+    end
+
+    enslaved = false
+    enslaver = false
+
+    parsed.each do |str|
+      if str.downcase.include?('enslaved')
+        enslaved = true
+      elsif str.downcase.include?('enslaver')
+        enslaver = true
+      end
+    end
+
+    result = []
+
+    if enslaved
+      result << 'Enslaved'
+    end
+
+    if enslaver
+      result << 'Enslaver'
+    end
+
+    JSON.generate(result)
+  end
+
   fields = {
     events: {
       'name': 'name',
@@ -148,8 +186,8 @@ def parse_nbu
       'middle_name': nil,
       'biography': nil,
       "udf_#{env['UDF_PEOPLE_GENDER_UUID']}": Proc.new { |person| transform_gender(person) },
-      "udf_#{env['UDF_PEOPLE_APPROXIMATE_BIRTH_YEAR_UUID']}": 'approximate_birth_year',
-      "udf_#{env['UDF_PEOPLE_STATUS_UUID']}": 'status',
+      "udf_#{env['UDF_PEOPLE_BIRTHDATE_UUID']}": 'approximate_birth_year',
+      "udf_#{env['UDF_PEOPLE_STATUS_UUID']}": Proc.new { |person| transform_status(person) },
       "udf_#{env['UDF_PEOPLE_OCCUPATION_UUID']}": 'occupation'
     },
     places: {
@@ -163,7 +201,7 @@ def parse_nbu
   }
 
   relation_udfs = {
-    documents_events: {
+    items_events: {
       "udf_#{env['UDF_DOCUMENTS_EVENTS_XML_ID_UUID']}": 'xml_id'
     },
     events_people: {
@@ -191,11 +229,12 @@ def parse_nbu
 
   transform.parse_models
 
+  transform.parse_simple_relation('items', 'events')
   transform.parse_simple_relation('events', 'people')
   transform.parse_simple_relation('events', 'places')
   transform.parse_simple_relation('items', 'people')
   transform.parse_simple_relation('items', 'places')
-  transform.parse_simple_relation('taxonomies', 'people')
+  transform.parse_simple_relation('people', 'taxonomies')
 
   transform.parse_enslavements
   transform.parse_family_relations
