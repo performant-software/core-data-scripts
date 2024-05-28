@@ -140,7 +140,7 @@ module Csv
       unless File.exist?(relationships_path)
         init_relationships(relationships_path)
       end
-  
+
       primary_table = CSV.read(primary_csv, headers: true)
       related_table = CSV.read(secondary_csv, headers: true)
       relations_table = CSV.read(relation_csv, headers: true)
@@ -160,7 +160,13 @@ module Csv
 
             if udfs
               udfs.keys.each do |key|
-                new_relation[key] = relation[udfs[key]]
+                if udfs[key].class == Proc
+                  result = udfs[key].call(relation, matching_primary, matching_related) || nil
+                elsif udfs[key].class == String
+                  result = relation[udfs[key]] || nil
+                end
+
+                new_relation[key] = result
               end
             end
 

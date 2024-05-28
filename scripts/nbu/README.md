@@ -1,5 +1,9 @@
 # NBU Script Readme
 
+## XMLs
+
+This script is a bit different from the others. It expects all the XML files from ArchivEngine to sit in `input/nbu/xml` so it can replace the old ID format (e.g. `#Jose_0001`) with the new UUID-based XML IDs. After running the script, you should import these files into a new FairCopy.cloud project and connect the Core Data project to it.
+
 ## User-defined fields
 
 Since user-defined fields are stored in a `user_defined` `jsonb` column, we need to use a special query that looks like:

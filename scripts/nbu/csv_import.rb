@@ -3,6 +3,7 @@ require 'dotenv'
 require 'optparse'
 require 'securerandom'
 require 'json'
+require 'nokogiri'
 
 require_relative '../../core/archive'
 require_relative '../../core/csv/plain_csv_ingester'
@@ -56,7 +57,7 @@ class NbuTransform < Csv::PlainCsvIngester
       enslavements.each do |enslavement|
         matching_enslaver = people.find { |p| p['original_id'] == enslavement['enslaver_id'] }
         matching_enslaved = people.find { |p| p['original_id'] == enslavement['enslaved_id'] }
-        
+
         if matching_enslaver && matching_enslaved
           new_relation = {}
           new_relation['project_model_relationship_id'] = @env['PROJECT_MODEL_RELATIONSHIP_ENSLAVEMENTS'].to_i
@@ -126,6 +127,66 @@ def parse_nbu
       person['gender'] = 'Male'
     elsif person['gender'] == '1'
       person['gender'] = 'Female'
+    end
+  end
+
+  def get_element_type(model_type)
+    element_types = {
+      'person': 'persName',
+      'place': 'placeName',
+      'event': 'div'
+    }
+
+    element_types[model_type.to_sym]
+  end
+
+  # Replace the old style of XML ID with a UUID in both the
+  # XML resource and the Core Data relationship record.
+  def migrate_xml_id(relation, item, related_record, model_type, env)
+    new_xml_id = "_#{related_record['uuid']}"
+
+    xml_path = File.expand_path("output/nbu/xml/#{item["udf_#{env['UDF_ITEMS_ARCHIVENGINE_ID_UUID']}"]}.xml")
+
+    doc = File.open(xml_path) { |f| Nokogiri::XML(f) }
+
+    # Update all the occurrences of this record in the text
+    matches = doc.xpath("//xmlns:#{get_element_type(model_type)}[@sameAs=\"##{relation['xml_id']}\"]")
+    matches.each do |el|
+      el['sameAs'] = "##{new_xml_id}"
+    end
+
+    File.write(xml_path, doc)
+
+    new_xml_id
+  end
+
+  def copy_input_xmls
+    input_path = File.expand_path('input/nbu/xml')
+    output_path = File.expand_path('output/nbu')
+
+    FileUtils.cp_r(input_path, output_path)
+  end
+
+  # These will be generated fresh by the FCC Bridge the first time each document
+  # is updated. I don't think we need to go through the trouble of migrating
+  # the standoff XMLs to a new format when they're so temporary.
+  def remove_standoffs
+    path = File.expand_path('output/nbu/xml')
+    files = Dir.entries(path)
+
+    files.each do |file|
+      unless ['.', '..'].include? file
+        filepath = File.join(path, file)
+        doc = File.open(filepath) { |f| Nokogiri::XML(f) }
+
+        standoff = doc.at_xpath('//xmlns:standOff')
+
+        if standoff
+          standoff.remove
+        end
+
+        File.write(filepath, doc)
+      end
     end
   end
 
@@ -202,16 +263,16 @@ def parse_nbu
 
   relation_udfs = {
     items_events: {
-      "udf_#{env['UDF_DOCUMENTS_EVENTS_XML_ID_UUID']}": 'xml_id'
+      "udf_#{env['UDF_DOCUMENTS_EVENTS_XML_ID_UUID']}": Proc.new { |relation, item, event| migrate_xml_id(relation, item, event, 'event', env) }
     },
     events_people: {
       "udf_#{env['UDF_EVENTS_PEOPLE_TYPE_UUID']}": 'type'
     },
     items_people: {
-      "udf_#{env['UDF_ITEMS_PEOPLE_XML_ID_UUID']}": 'xml_id'
+      "udf_#{env['UDF_ITEMS_PEOPLE_XML_ID_UUID']}": Proc.new { |relation, item, person| migrate_xml_id(relation, item, person, 'person', env) }
     },
     items_places: {
-      "udf_#{env['UDF_ITEMS_PLACES_XML_ID_UUID']}": 'xml_id'
+      "udf_#{env['UDF_ITEMS_PLACES_XML_ID_UUID']}": Proc.new { |relation, item, place| migrate_xml_id(relation, item, place, 'place', env) }
     }
   }
 
@@ -228,6 +289,9 @@ def parse_nbu
   )
 
   transform.parse_models
+
+  transform.copy_input_xmls
+  transform.remove_standoffs
 
   transform.parse_simple_relation('items', 'events')
   transform.parse_simple_relation('events', 'people')
