@@ -205,8 +205,12 @@ def parse_nbu
 
         elements_with_sameas_atts = doc.xpath('//xmlns:*[@sameAs]')
 
+        reg = /#[a-zA-Z]/
+
         elements_with_sameas_atts.each do |el|
-          el.remove_attribute('sameAs')
+          if reg.match(el['sameAs'])
+            el.remove_attribute('sameAs')
+          end
         end
 
         File.write(filepath, doc)
