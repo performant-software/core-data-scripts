@@ -190,6 +190,30 @@ def parse_nbu
     end
   end
 
+  # There will still be some orphaned sameAs attributes in some docs,
+  # where the corresponding relationship was deleted at some point
+  # or (mostly) for merged documents. This function looks for sameAs
+  # attributes that aren't UUIDs and removes them.
+  def remove_dead_sameas_attributes
+    path = File.expand_path('output/nbu/xml')
+    files = Dir.entries(path)
+
+    files.each do |file|
+      unless ['.', '..'].include? file
+        filepath = File.join(path, file)
+        doc = File.open(filepath) { |f| Nokogiri::XML(f) }
+
+        elements_with_sameas_atts = doc.xpath('//xmlns:*[@sameAs]')
+
+        elements_with_sameas_atts.each do |el|
+          el.remove_attribute('sameAs')
+        end
+
+        File.write(filepath, doc)
+      end
+    end
+  end
+
   # Normalize the different possible values for enslavement status into
   # just two: `Enslaved` and `Enslaver`. They are not mutually exclusive.
   def transform_status(person)
@@ -303,6 +327,8 @@ def parse_nbu
   transform.parse_enslavements
   transform.parse_family_relations
   transform.parse_people_places
+
+  transform.remove_dead_sameas_attributes
 
   transform.cleanup([
     'events',
