@@ -43,6 +43,7 @@ module Csv
 
       @relationship_headers = [
         'project_model_relationship_id',
+        'uuid',
         'primary_record_uuid',
         'primary_record_type',
         'related_record_uuid',
@@ -52,7 +53,7 @@ module Csv
       if @relation_udfs && @relation_udfs.count > 0
         @relation_udfs.values.each do |udf_hash|
           udf_hash.keys.each do |key|
-            @relationship_headers.push(key)
+            @relationship_headers.push(key.to_s.gsub('-', '_'))
           end
         end
       end
@@ -85,7 +86,7 @@ module Csv
           csv_out << [
             'project_model_id',
             'uuid',
-            *@fields[filename.to_sym].keys,
+            *@fields[filename.to_sym].keys.map{ |k| k.to_s.gsub('-', '_') },
             'original_id'
           ]
 
@@ -153,6 +154,7 @@ module Csv
           if matching_related && matching_primary
             new_relation = {}
             new_relation['project_model_relationship_id'] = project_model_relation_id.to_i
+            new_relation['uuid'] = nil
             new_relation['primary_record_uuid'] = matching_primary['uuid']
             new_relation['primary_record_type'] = primary_model
             new_relation['related_record_uuid'] = matching_related['uuid']
@@ -166,7 +168,7 @@ module Csv
                   result = relation[udfs[key]] || nil
                 end
 
-                new_relation[key] = result
+                new_relation[key.to_s.gsub('-', '_')] = result
               end
             end
 

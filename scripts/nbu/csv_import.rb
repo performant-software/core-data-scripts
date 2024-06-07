@@ -145,7 +145,7 @@ def parse_nbu
   def migrate_xml_id(relation, item, related_record, model_type, env)
     new_xml_id = "_#{related_record['uuid']}"
 
-    xml_path = File.expand_path("output/nbu/xml/#{item["udf_#{env['UDF_ITEMS_ARCHIVENGINE_ID_UUID']}"]}.xml")
+    xml_path = File.expand_path("output/nbu/xml/#{item["udf_#{env['UDF_ITEMS_ARCHIVENGINE_ID_UUID'].gsub('-', '_')}"]}.xml")
 
     doc = File.open(xml_path) { |f| Nokogiri::XML(f) }
 
