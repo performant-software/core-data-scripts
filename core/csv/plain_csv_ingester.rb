@@ -93,11 +93,11 @@ module Csv
           table.each do |row|
             unless id_map[row[@id_map_column]]
               # If the source DB already has UUIDs, we can just use those.
-              if row['uuid']
-                id_map[row[@id_map_column]] = row['uuid']
-              else
+              # if row['uuid']
+              #   id_map[row[@id_map_column]] = row['uuid']
+              # else
                 id_map[row[@id_map_column]] = SecureRandom.uuid
-              end
+              # end
             end
 
             model_fields = @fields[filename.to_sym].values.map do |val|
