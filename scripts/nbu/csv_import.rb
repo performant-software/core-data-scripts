@@ -205,7 +205,7 @@ def parse_nbu
 
         elements_with_sameas_atts = doc.xpath('//xmlns:*[@sameAs]')
 
-        reg = /#[a-zA-Z]/
+        reg = /#[\p{L}]/
 
         elements_with_sameas_atts.each do |el|
           if reg.match(el['sameAs'])
