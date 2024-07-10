@@ -218,6 +218,29 @@ def parse_nbu
     end
   end
 
+  def add_item_sameas_attributes(env)
+    items_path = File.expand_path('output/nbu/temp_items.csv')
+
+    items_table = CSV.read(items_path, headers: true)
+
+    items_table.each do |row|
+      xml_id = row["udf_#{env['UDF_ITEMS_ARCHIVENGINE_ID_UUID']}".gsub('-', '_')]
+
+      if xml_id
+        xml_path = File.expand_path("output/nbu/xml/#{xml_id}.xml")
+
+        if File.exist?(xml_path)
+          doc = File.open(xml_path) { |f| Nokogiri::XML(f) }
+
+          header = doc.at_xpath('//xmlns:teiHeader')
+          header['sameAs'] = "#_#{row['uuid']}"
+
+          File.write(xml_path, doc)
+        end
+      end
+    end
+  end
+
   # Normalize the different possible values for enslavement status into
   # just two: `Enslaved` and `Enslaver`. They are not mutually exclusive.
   def transform_status(person)
@@ -333,6 +356,7 @@ def parse_nbu
   transform.parse_people_places
 
   transform.remove_dead_sameas_attributes
+  transform.add_item_sameas_attributes(env)
 
   transform.cleanup([
     'events',
