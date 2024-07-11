@@ -232,8 +232,8 @@ def parse_nbu
         if File.exist?(xml_path)
           doc = File.open(xml_path) { |f| Nokogiri::XML(f) }
 
-          header = doc.at_xpath('//xmlns:teiHeader')
-          header['sameAs'] = "#_#{row['uuid']}"
+          file_desc = doc.at_xpath('//xmlns:fileDesc')
+          file_desc['sameAs'] = "#_#{row['uuid']}"
 
           File.write(xml_path, doc)
         end
