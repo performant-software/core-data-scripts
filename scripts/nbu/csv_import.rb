@@ -298,7 +298,8 @@ def parse_nbu
       'middle_name': nil,
       'biography': nil,
       "udf_#{env['UDF_PEOPLE_GENDER_UUID']}": Proc.new { |person| transform_gender(person) },
-      "udf_#{env['UDF_PEOPLE_BIRTHDATE_UUID']}": 'approximate_birth_year',
+      "udf_#{env['UDF_PEOPLE_BIRTHDATE_UUID']}": 'birth_date',
+      "udf_#{env['UDF_PEOPLE_DEATHDATE_UUID']}": 'death_date',
       "udf_#{env['UDF_PEOPLE_STATUS_UUID']}": Proc.new { |person| transform_status(person) },
       "udf_#{env['UDF_PEOPLE_OCCUPATION_UUID']}": 'occupation'
     },
