@@ -1,0 +1,59 @@
+{
+  "lieu.csv": [{
+    "name": "record_id",
+    "type": "INTEGER"
+  }, {
+    "name": "name",
+    "type": "VARCHAR"
+  }, {
+    "name": "mrc",
+    "type": "VARCHAR"
+  }, {
+    "name": "region",
+    "type": "VARCHAR"
+  }],
+  "individu.csv": [{
+    "name": "record_id",
+    "type": "INTEGER"
+  }, {
+    "name": "name",
+    "type": "VARCHAR"
+  }, {
+    "name": "occupations",
+    "type": "VARCHAR"
+  }, {
+    "name": "notes",
+    "type": "VARCHAR"
+  }],
+  "oeuvre.csv": [{
+    "name": "record_id",
+    "type": "INTEGER"
+  }, {
+    "name": "name",
+    "type": "VARCHAR"
+  }, {
+    "name": "lieu_id",
+    "type": "INTEGER"
+  }, {
+    "name": "type",
+    "type": "VARCHAR"
+  }, {
+    "name": "etat",
+    "type": "VARCHAR"
+  }, {
+    "name": "latitude",
+    "type": "DECIMAL"
+  }, {
+    "name": "longitude",
+    "type": "DECIMAL"
+  }, {
+    "name": "organization",
+    "type": "VARCHAR"
+  }, {
+    "name": "notes",
+    "type": "VARCHAR"
+  }, {
+    "name": "fiche_cprq",
+    "type": "VARCHAR"
+  }]
+}
