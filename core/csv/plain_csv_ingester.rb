@@ -40,6 +40,7 @@ module Csv
 
       @relationship_headers = [
         'project_model_relationship_id',
+        'uuid',
         'primary_record_uuid',
         'primary_record_type',
         'related_record_uuid',
@@ -134,6 +135,7 @@ module Csv
           if matching_related && matching_primary
             new_relation = {}
             new_relation['project_model_relationship_id'] = project_model_relation_id.to_i
+            new_relation['uuid'] = nil
             new_relation['primary_record_uuid'] = matching_primary['uuid']
             new_relation['primary_record_type'] = primary_model
             new_relation['related_record_uuid'] = matching_related['uuid']
