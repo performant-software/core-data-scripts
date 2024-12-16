@@ -55,7 +55,7 @@ def parse_pan_african
   }
 
   relation_udfs = {
-    people_events: {
+    events_people: {
       "udf_#{env['UDF_PEOPLE_EVENTS_CITATION_UUID']}": 'citation',
       "udf_#{env['UDF_PEOPLE_EVENTS_NOTES_UUID']}": 'notes'
     }
@@ -73,60 +73,11 @@ def parse_pan_african
 
   transform.parse_models
 
-  transform.parse_relation(
-    primary_model: 'CoreDataConnector::Event',
-    secondary_model: 'CoreDataConnector::Person',
-    primary_csv: "#{output}/temp_events.csv",
-    secondary_csv: "#{output}/temp_people.csv",
-    primary_id_column: 'events_id',
-    secondary_id_column: 'people_id',
-    relation_csv: "#{input}/events_people.csv",
-    project_model_relation_id: env['PROJECT_MODEL_RELATIONSHIP_ID_EVENTS_PEOPLE'],
-    udfs: relation_udfs[:people_events]
-  )
-
-  transform.parse_relation(
-    primary_model: 'CoreDataConnector::Person',
-    secondary_model: 'CoreDataConnector::Place',
-    primary_csv: "#{output}/temp_people.csv",
-    secondary_csv: "#{output}/temp_places.csv",
-    primary_id_column: 'people_id',
-    secondary_id_column: 'places_id',
-    relation_csv: "#{input}/people_places.csv",
-    project_model_relation_id: env['PROJECT_MODEL_RELATIONSHIP_ID_PEOPLE_PLACES']
-  )
-
-  transform.parse_relation(
-    primary_model: 'CoreDataConnector::Event',
-    secondary_model: 'CoreDataConnector::Place',
-    primary_csv: "#{output}/temp_events.csv",
-    secondary_csv: "#{output}/temp_places.csv",
-    primary_id_column: 'events_id',
-    secondary_id_column: 'places_id',
-    relation_csv: "#{input}/events_places.csv",
-    project_model_relation_id: env['PROJECT_MODEL_RELATIONSHIP_ID_EVENTS_PLACES']
-  )
-
-  transform.parse_relation(
-    primary_model: 'CoreDataConnector::Organization',
-    secondary_model: 'CoreDataConnector::Person',
-    primary_csv: "#{output}/temp_organizations.csv",
-    secondary_csv: "#{output}/temp_people.csv",
-    primary_id_column: 'organizations_id',
-    secondary_id_column: 'people_id',
-    relation_csv: "#{input}/organizations_people.csv",
-    project_model_relation_id: env['PROJECT_MODEL_RELATIONSHIP_ID_ORGANIZATIONS_PEOPLE']
-  )
-  transform.parse_relation(
-    primary_model: 'CoreDataConnector::Organization',
-    secondary_model: 'CoreDataConnector::Place',
-    primary_csv: "#{output}/temp_organizations.csv",
-    secondary_csv: "#{output}/temp_places.csv",
-    primary_id_column: 'organizations_id',
-    secondary_id_column: 'places_id',
-    relation_csv: "#{input}/organizations_places.csv",
-    project_model_relation_id: env['PROJECT_MODEL_RELATIONSHIP_ID_ORGANIZATIONS_PLACES']
-  )
+  transform.parse_simple_relation('events', 'people')
+  transform.parse_simple_relation('people', 'places')
+  transform.parse_simple_relation('events', 'places')
+  transform.parse_simple_relation('organizations', 'people')
+  transform.parse_simple_relation('organizations', 'places')
 
   transform.cleanup(model_files)
 
