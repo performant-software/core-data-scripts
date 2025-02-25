@@ -4,6 +4,7 @@ require 'optparse'
 
 require_relative './scripts/bischoff/csv_import.rb'
 require_relative './scripts/gca/csv_import.rb'
+require_relative './scripts/gwc/csv_import.rb'
 require_relative './scripts/pan_african/csv_import.rb'
 require_relative './scripts/rumpf/csv_import.rb'
 require_relative './scripts/supplique/csv_import.rb'
@@ -33,6 +34,8 @@ def main
     parse_supplique
   when 'gca'
     parse_gca
+  when 'gwc'
+    parse_gwc
   when 'rumpf'
     parse_rumpf
   when 'bischoff'
