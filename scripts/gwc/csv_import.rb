@@ -24,25 +24,27 @@ def handle_array(array)
   "[#{array.join(',')}]"
 end
 
+def date_to_iso(date)
+  if date.nil?
+    nil
+  elsif date < 0
+    # handle BC dates by removing negative sign and appending BC
+    date = date.to_s[1..-1]
+    date = date.rjust(4, '0')
+    "#{date}-01-01T05:00:00.000Z BC"
+  else
+    date = date == 0 ? 1 : date
+    date = date.to_s.rjust(4, '0')
+    "#{date}-01-01T05:00:00.000Z"
+  end
+end
+
 def handle_dates(dates)
   # fuzzy date range in the json format expected by core data. all dates
   # in this spreadsheet are simply integers representing years
   dates[0] = Integer dates[0] rescue nil
   dates[1] = Integer dates[1] rescue nil
-  dates.map! {|date|
-    if date.nil?
-      nil
-    elsif date < 0
-      # handle BC dates by removing negative sign and appending BC
-      date = date.to_s[1..-1]
-      date = date.rjust(4, '0')
-      "#{date}-01-01T05:00:00.000Z BC"
-    else
-      date = date == 0 ? 1 : date
-      date = date.to_s.rjust(4, '0')
-      "#{date}-01-01T05:00:00.000Z"
-    end
-  }
+  dates.map! {|date| date_to_iso(date)}
   if !dates[0].nil? and !dates[1].nil?
     date_range = {
       range: true,
