@@ -74,6 +74,7 @@ def parse_gwc
   place_coords = {}
 
   # UDF multi select values to add
+  uniq_content_types = []
   uniq_forms = []
   uniq_materials = []
   uniq_researchers = []
@@ -127,10 +128,11 @@ def parse_gwc
     # handle content fields format "content type (content desc)""
     content_desc, content_type = nil, nil
     if row.key? 'content' and !row['content'].nil?
-      content_match = row['content'].match /^(?<type>.+) \((?<desc>.+)\)$/m
+      content_match = row['content'].match /^(?<type>[^\(]+) \((?<desc>.+)\)$/m
       if content_match
         content_type = content_match[:type]
         content_desc = content_match[:desc]
+        uniq_content_types.push(content_type)
       end
     end
 
@@ -322,6 +324,7 @@ def parse_gwc
   end
 
   # uncomment to get unique values for multi-select fields in order to update project config
+  # puts handle_array(Set.new(uniq_content_types).to_a)
   # puts handle_array(Set.new(uniq_forms).to_a)
   # puts handle_array(Set.new(uniq_materials).to_a)
   # puts handle_array(Set.new(uniq_religions).to_a)
