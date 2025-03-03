@@ -60,7 +60,7 @@ def handle_dates(dates)
 end
 
 def parse_gwc
-  # expects witnesses.csv and manuscripts.csv in input/gwc
+  # expects witnesses.csv, manuscripts.csv, and gpc.csv in input/gwc
   input = File.expand_path('input/gwc')
   output = File.expand_path('output/gwc')
   env = Dotenv.parse './scripts/gwc/.env.staging'
@@ -83,7 +83,7 @@ def parse_gwc
   uniq_scripts = []
   uniq_script_formats = []
 
-  # split the two flat CSVs into per-model CSVs
+  # split the three flat CSVs into per-model CSVs
   CSV.foreach("#{input}/manuscripts.csv", headers: true) do |row|
     # handle multi-value field columns with the same name (e.g. "1", "2", "3")
     languages = (6..10).map {|n| row[n]}.concat [val_or_nil(row['upper_text_language'])].compact
@@ -301,6 +301,42 @@ def parse_gwc
     }.sort_by { |key| key }.to_h))
   end
 
+  # geopolitical contexts
+  CSV.foreach("#{input}/gpc.csv", headers: true) do |row|
+    # handle 2-column bibliography
+    bibliography = row['bibliography']
+    if (row['bibliography_2'] || '').strip != ''
+      bibliography << "; #{row['bibliography_2']}"
+    end
+
+    # handle region
+    uniq_regions.push(row['region'])
+
+    # handle dates
+    dates = row['start_date'], row['end_date']
+    dates[0] = Integer dates[0] rescue nil
+    dates[1] = Integer dates[1] rescue nil
+    dates.map! {|date| date_to_iso(date)}
+
+    # create final item row
+    events.push({
+      project_model_id: env['PROJECT_MODEL_ID_GEOPOLITICAL_CONTEXTS'],
+      uuid: SecureRandom.uuid,
+      name: row['name'],
+      description: nil,
+    }.merge({
+      start_date: dates[0],
+      start_date_description: nil,
+      end_date: dates[1],
+      end_date_description: nil,
+      "udf_#{env['UDF_EVENTS_REGION_UUID']}": row['region'],
+      "udf_#{env['UDF_EVENTS_PERIODO_LABEL_UUID']}": row['periodo_label'],
+      "udf_#{env['UDF_EVENTS_PERIODO_REGION_UUID']}": row['periodo_region'],
+      "udf_#{env['UDF_EVENTS_PERIODO_URL_UUID']}": row['periodo'],
+      "udf_#{env['UDF_EVENTS_WIKIDATA_URL_UUID']}": row['wikidata'],
+      "udf_#{env['UDF_EVENTS_PERIODO_AUTHORITY_URL_UUID']}": row['periodo_authority'],
+      "udf_#{env['UDF_EVENTS_BIBLIOGRAPHY_UUID']}": bibliography,
+      "udf_#{env['UDF_EVENTS_WIKIPEDIA_URL_UUID']}": row['wikipedia'],
     }.sort_by { |key| key }.to_h))
   end
 
@@ -354,6 +390,7 @@ def parse_gwc
   end
 
   model_files = {
+    'events': events,
     'items': items,
     'organizations': organizations,
     'people': people,
