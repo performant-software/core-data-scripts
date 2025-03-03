@@ -168,7 +168,7 @@ def parse_gwc
       interlinear,
       decor_binding,
       decor_initials
-    ].any?
+    ].any? ? true : nil
 
     # create final item row hash
     items.push({
