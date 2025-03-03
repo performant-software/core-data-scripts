@@ -66,9 +66,10 @@ def parse_gwc
   env = Dotenv.parse './scripts/gwc/.env.staging'
 
   items = []
+  events = []
   people_names = []
   language_names = []
-  gpc_names = []
+  material_names = []
   oragnization_names = []
   place_names = []
   place_coords = {}
@@ -76,9 +77,9 @@ def parse_gwc
   # UDF multi select values to add
   uniq_content_types = []
   uniq_forms = []
-  uniq_materials = []
   uniq_researchers = []
   uniq_religions = []
+  uniq_regions = []
   uniq_scripts = []
   uniq_script_formats = []
 
@@ -87,7 +88,7 @@ def parse_gwc
     # handle multi-value field columns with the same name (e.g. "1", "2", "3")
     languages = (6..10).map {|n| row[n]}.concat [val_or_nil(row['upper_text_language'])].compact
     materials = (33..37).map {|n| row[n]}
-    uniq_materials.concat materials.map {|entry| val_or_nil(entry) }.compact
+    material_names.concat materials.map {|entry| val_or_nil(entry) }.compact
     forms = (39..41).map {|n| row[n]}
     uniq_forms.concat forms.map {|entry| val_or_nil(entry) }.compact
     religions = (48..50).map {|n| val_or_nil(row[n]) }.compact
@@ -114,10 +115,7 @@ def parse_gwc
     # handle languages
     language_names.concat languages.compact
 
-    # handle geopolitical contexts, places and organizations
-    if not is_falsy(row['geopolitical_context']) and row['geopolitical_context'] != 'update pending'
-      gpc_names.concat row['geopolitical_context'].split('; ').compact
-    end
+    # handle organizations and places
     if not is_falsy(row['current_location'])
       oragnization_names.concat row['current_location'].split('; ').compact
     end
@@ -152,6 +150,26 @@ def parse_gwc
     height = Float row['dimension_height'] rescue nil
     folios = Integer row['number_of_folios'] rescue nil
 
+    # handle decorations
+    page_dye = handle_bool(row['page dye (Y/N)'])
+    luxury_ink = handle_bool(row['luxury ink (Y/N)'])
+    frontispiece = handle_bool(row['frontispiece (Y/N)'])
+    full_page = handle_bool(row['full page illustrations (Y/N)'])
+    half_page = handle_bool(row['half page illustrations (Y/N)'])
+    interlinear = handle_bool(row['interlinear or marginal illustrations (Y/N)'])
+    decor_binding = handle_bool(row['decorated binding/cover/case (Y/N)'])
+    decor_initials = handle_bool(row['decorated initials (Y/N)'])
+    contains_decorations = [
+      page_dye,
+      luxury_ink,
+      frontispiece,
+      full_page,
+      half_page,
+      interlinear,
+      decor_binding,
+      decor_initials
+    ].any?
+
     # create final item row hash
     items.push({
       project_model_id: env['PROJECT_MODEL_ID_ITEMS'],
@@ -159,6 +177,7 @@ def parse_gwc
       name: row['manuscript'],
     }.merge({
       "udf_#{env['UDF_ITEMS_TYPE_UUID']}": 'Manuscript',
+      "udf_#{env['UDF_ITEMS_OTHER_EVIDENCE_SUBCATEGORY_UUID']}": nil,
       "udf_#{env['UDF_ITEMS_SIGNIFICANCE_UUID']}": val_or_nil(row['significance']),
       "udf_#{env['UDF_ITEMS_CONTENT_TYPE_UUID']}": content_type,
       "udf_#{env['UDF_ITEMS_CONTENT_DESCRIPTION_UUID']}": content_desc,
@@ -166,11 +185,7 @@ def parse_gwc
       "udf_#{env['UDF_ITEMS_MULTILINGUAL_UUID']}": handle_bool(row['multilingual']),
       "udf_#{env['UDF_ITEMS_MULTI_MANUSCRIPT_CORPUS_UUID']}": handle_bool(row['is_multi_mss_corpus']),
       "udf_#{env['UDF_ITEMS_FORMS_UUID']}": handle_array(forms),
-      "udf_#{env['UDF_ITEMS_MATERIALS_UUID']}": handle_array(materials),
       "udf_#{env['UDF_ITEMS_RELIGIONS_UUID']}": handle_array(religions),
-      "udf_#{env['UDF_ITEMS_ENTRY_RESEARCHER_UUID']}": handle_array(researchers),
-      "udf_#{env['UDF_ITEMS_PALIMPSEST_UUID']}": handle_bool(row['palimpsest']),
-      "udf_#{env['UDF_ITEMS_PALIMPSEST_UPPER_TEXT_CONTENT_UUID']}": val_or_nil(row['upper_text_content']),
       "udf_#{env['UDF_ITEMS_COLOPHON_UUID']}": handle_bool(row['colophon']),
       "udf_#{env['UDF_ITEMS_COLOPHON_SCRIBE_UUID']}": val_or_nil(row['scribe']),
       "udf_#{env['UDF_ITEMS_COLOPHON_PATRON_UUID']}": val_or_nil(row['patron']),
@@ -180,6 +195,22 @@ def parse_gwc
       "udf_#{env['UDF_ITEMS_DIMENSION_WIDTH_UUID']}": width,
       "udf_#{env['UDF_ITEMS_DIMENSION_HEIGHT_UUID']}": height,
       "udf_#{env['UDF_ITEMS_NUMBER_OF_FOLIOS_UUID']}": folios,
+      "udf_#{env['UDF_ITEMS_PALIMPSEST_UUID']}": handle_bool(row['palimpsest']),
+      "udf_#{env['UDF_ITEMS_PALIMPSEST_UPPER_TEXT_CONTENT_UUID']}": val_or_nil(row['upper_text_content']),
+      "udf_#{env['UDF_ITEMS_BINDINGS_BINDING_UUID']}": handle_bool(row['binding (Y/N)']),
+      "udf_#{env['UDF_ITEMS_BINDINGS_COVER_UUID']}": handle_bool(row['cover (Y/N)']),
+      "udf_#{env['UDF_ITEMS_BINDINGS_CONTAINER_UUID']}": handle_bool(row['container (Y/N)']),
+      "udf_#{env['UDF_ITEMS_BINDINGS_DESCRIPTION_UUID']}": row['bindings'],
+      "udf_#{env['UDF_ITEMS_CONTAINS_DECORATIONS_UUID']}": contains_decorations,
+      "udf_#{env['UDF_ITEMS_DECORATION_PAGE_DYE_UUID']}": page_dye,
+      "udf_#{env['UDF_ITEMS_DECORATION_LUXURY_INK_UUID']}": luxury_ink,
+      "udf_#{env['UDF_ITEMS_DECORATION_FRONTISPIECE_UUID']}": frontispiece,
+      "udf_#{env['UDF_ITEMS_DECORATION_FULL_PAGE_UUID']}": full_page,
+      "udf_#{env['UDF_ITEMS_DECORATION_HALF_PAGE_UUID']}": half_page,
+      "udf_#{env['UDF_ITEMS_DECORATION_INTERLINEAR_UUID']}": interlinear,
+      "udf_#{env['UDF_ITEMS_DECORATION_BINDING_UUID']}": decor_binding,
+      "udf_#{env['UDF_ITEMS_DECORATION_INITIALS_UUID']}": decor_initials,
+      "udf_#{env['UDF_ITEMS_DECORATION_DESCRIPTION_UUID']}": row['decoration'],
       "udf_#{env['UDF_ITEMS_FINDSPOT_DESCRIPTION_UUID']}": val_or_nil(row['findspot']),
       "udf_#{env['UDF_ITEMS_SCIENTIFIC_ANALYSIS_UUID']}": val_or_nil(row['scientific_analysis']),
       "udf_#{env['UDF_ITEMS_BIBLIOGRAPHY_UUID']}": row['bibliography'],
@@ -196,6 +227,7 @@ def parse_gwc
       "udf_#{env['UDF_ITEMS_BIBLIOGRAPHY_LINK_3_UUID']}": bibliography_links[2],
       "udf_#{env['UDF_ITEMS_BIBLIOGRAPHY_LINK_4_UUID']}": bibliography_links[3],
       "udf_#{env['UDF_ITEMS_WITNESS_TEXT_UUID']}": nil,
+      "udf_#{env['UDF_ITEMS_ENTRY_RESEARCHER_UUID']}": handle_array(researchers),
     }.sort_by { |key| key }.to_h))
   end
 
@@ -205,13 +237,17 @@ def parse_gwc
     people_names.concat authors
     # handle dates
     dates = row['Earliest'], row['Latest']
+    # handle materials
+    materials = (row['Substrate(s)'] || '').split(',')
+    material_names.concat materials.map {|entry| val_or_nil(entry) }.compact
     # create final item row
     items.push({
       project_model_id: env['PROJECT_MODEL_ID_ITEMS'],
       uuid: SecureRandom.uuid,
       name: row['Work'],
     }.merge({
-      "udf_#{env['UDF_ITEMS_TYPE_UUID']}": 'Witness',
+      "udf_#{env['UDF_ITEMS_TYPE_UUID']}": 'Other Evidence',
+      "udf_#{env['UDF_ITEMS_OTHER_EVIDENCE_SUBCATEGORY_UUID']}": nil,
       "udf_#{env['UDF_ITEMS_SIGNIFICANCE_UUID']}": nil,
       "udf_#{env['UDF_ITEMS_CONTENT_TYPE_UUID']}": nil,
       "udf_#{env['UDF_ITEMS_CONTENT_DESCRIPTION_UUID']}": row['Content'],
@@ -219,11 +255,7 @@ def parse_gwc
       "udf_#{env['UDF_ITEMS_MULTILINGUAL_UUID']}": nil,
       "udf_#{env['UDF_ITEMS_MULTI_MANUSCRIPT_CORPUS_UUID']}": nil,
       "udf_#{env['UDF_ITEMS_FORMS_UUID']}": row['Form(s)'] ? handle_array(row['Form(s)'].split(',')) : [],
-      "udf_#{env['UDF_ITEMS_MATERIALS_UUID']}": row['Substrate(s)'] ? handle_array(row['Substrate(s)'].split(',')) : [],
       "udf_#{env['UDF_ITEMS_RELIGIONS_UUID']}": [],
-      "udf_#{env['UDF_ITEMS_ENTRY_RESEARCHER_UUID']}": [],
-      "udf_#{env['UDF_ITEMS_PALIMPSEST_UUID']}": nil,
-      "udf_#{env['UDF_ITEMS_PALIMPSEST_UPPER_TEXT_CONTENT_UUID']}": nil,
       "udf_#{env['UDF_ITEMS_COLOPHON_UUID']}": nil,
       "udf_#{env['UDF_ITEMS_COLOPHON_SCRIBE_UUID']}": nil,
       "udf_#{env['UDF_ITEMS_COLOPHON_PATRON_UUID']}": nil,
@@ -233,6 +265,22 @@ def parse_gwc
       "udf_#{env['UDF_ITEMS_DIMENSION_WIDTH_UUID']}": nil,
       "udf_#{env['UDF_ITEMS_DIMENSION_HEIGHT_UUID']}": nil,
       "udf_#{env['UDF_ITEMS_NUMBER_OF_FOLIOS_UUID']}": nil,
+      "udf_#{env['UDF_ITEMS_PALIMPSEST_UUID']}": nil,
+      "udf_#{env['UDF_ITEMS_PALIMPSEST_UPPER_TEXT_CONTENT_UUID']}": nil,
+      "udf_#{env['UDF_ITEMS_BINDINGS_BINDING_UUID']}": nil,
+      "udf_#{env['UDF_ITEMS_BINDINGS_COVER_UUID']}": nil,
+      "udf_#{env['UDF_ITEMS_BINDINGS_CONTAINER_UUID']}": nil,
+      "udf_#{env['UDF_ITEMS_BINDINGS_DESCRIPTION_UUID']}": nil,
+      "udf_#{env['UDF_ITEMS_CONTAINS_DECORATIONS_UUID']}": nil,
+      "udf_#{env['UDF_ITEMS_DECORATION_PAGE_DYE_UUID']}": nil,
+      "udf_#{env['UDF_ITEMS_DECORATION_LUXURY_INK_UUID']}": nil,
+      "udf_#{env['UDF_ITEMS_DECORATION_FRONTISPIECE_UUID']}": nil,
+      "udf_#{env['UDF_ITEMS_DECORATION_FULL_PAGE_UUID']}": nil,
+      "udf_#{env['UDF_ITEMS_DECORATION_HALF_PAGE_UUID']}": nil,
+      "udf_#{env['UDF_ITEMS_DECORATION_INTERLINEAR_UUID']}": nil,
+      "udf_#{env['UDF_ITEMS_DECORATION_BINDING_UUID']}": nil,
+      "udf_#{env['UDF_ITEMS_DECORATION_INITIALS_UUID']}": nil,
+      "udf_#{env['UDF_ITEMS_DECORATION_DESCRIPTION_UUID']}": nil,
       "udf_#{env['UDF_ITEMS_FINDSPOT_DESCRIPTION_UUID']}": nil,
       "udf_#{env['UDF_ITEMS_SCIENTIFIC_ANALYSIS_UUID']}": nil,
       "udf_#{env['UDF_ITEMS_BIBLIOGRAPHY_UUID']}": nil,
@@ -249,6 +297,10 @@ def parse_gwc
       "udf_#{env['UDF_ITEMS_BIBLIOGRAPHY_LINK_3_UUID']}": nil,
       "udf_#{env['UDF_ITEMS_BIBLIOGRAPHY_LINK_4_UUID']}": nil,
       "udf_#{env['UDF_ITEMS_WITNESS_TEXT_UUID']}": row['Text/Image'],
+      "udf_#{env['UDF_ITEMS_ENTRY_RESEARCHER_UUID']}": [],
+    }.sort_by { |key| key }.to_h))
+  end
+
     }.sort_by { |key| key }.to_h))
   end
 
@@ -281,11 +333,11 @@ def parse_gwc
       name: lang_name,
     })
   end
-  Set.new(gpc_names).each do |gpc_name|
+  Set.new(material_names).each do |material_name|
     taxonomies.push({
-      project_model_id: env['PROJECT_MODEL_ID_GEOPOLITICAL_CONTEXTS'],
+      project_model_id: env['PROJECT_MODEL_ID_MATERIALS'],
       uuid: SecureRandom.uuid,
-      name: gpc_name,
+      name: material_name,
     })
   end
   places = []
@@ -326,7 +378,7 @@ def parse_gwc
   # uncomment to get unique values for multi-select fields in order to update project config
   # puts handle_array(Set.new(uniq_content_types).to_a)
   # puts handle_array(Set.new(uniq_forms).to_a)
-  # puts handle_array(Set.new(uniq_materials).to_a)
+  # puts handle_array(Set.new(uniq_regions).to_a)
   # puts handle_array(Set.new(uniq_religions).to_a)
   # puts handle_array(Set.new(uniq_researchers).to_a)
   # puts handle_array(Set.new(uniq_scripts).to_a)
