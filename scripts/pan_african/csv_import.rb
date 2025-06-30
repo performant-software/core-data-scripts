@@ -20,20 +20,18 @@ def parse_pan_african
     events: {
       'name': 'name',
       'description': nil,
-      'start_date': nil,
+      'start_date': 'start_date',
       'start_date_description': nil,
-      'end_date': nil,
+      'end_date': 'end_date',
       'end_date_description': nil,
-      "udf_#{env['UDF_EVENTS_DATES_UUID']}": 'dates',
       "udf_#{env['UDF_EVENTS_NOTES_UUID']}": 'notes',
-      "udf_#{env['UDF_EVENTS_EVENT_ID_UUID']}": 'id',
+      "udf_#{env['UDF_EVENTS_DATES_UUID']}": 'dates',
     },
     organizations: {
       'name': 'name',
       'description': nil,
       "udf_#{env['UDF_ORGANIZATIONS_NOTES_UUID']}": 'notes',
       "udf_#{env['UDF_ORGANIZATIONS_CITATION_UUID']}": 'citation',
-      "udf_#{env['UDF_ORGANIZATIONS_ORGANIZATION_ID_UUID']}": 'id',
       "udf_#{env['UDF_ORGANIZATIONS_DATES_UUID']}": 'dates',
     },
     people: {
@@ -41,11 +39,11 @@ def parse_pan_african
       'first_name': 'first_name',
       'middle_name': nil,
       'biography': nil,
-      "udf_#{env['UDF_PEOPLE_GENDER_CITATION_UUID']}": 'gender_citation',
-      "udf_#{env['UDF_PEOPLE_OCCUPATION_CITATION_UUID']}": 'occupation_citation',
       "udf_#{env['UDF_PEOPLE_GENDER_UUID']}": 'gender',
-      "udf_#{env['UDF_PEOPLE_OCCUPATION_UUID']}": 'occupation',
+      "udf_#{env['UDF_PEOPLE_OCCUPATION_CITATION_UUID']}": 'occupation_citation',
       "udf_#{env['UDF_PEOPLE_NOTES_UUID']}": 'notes',
+      "udf_#{env['UDF_PEOPLE_OCCUPATION_UUID']}": 'occupation',
+      "udf_#{env['UDF_PEOPLE_GENDER_CITATION_UUID']}": 'gender_citation',
     },
     places: {
       'name': 'name',
@@ -58,6 +56,9 @@ def parse_pan_african
     events_people: {
       "udf_#{env['UDF_PEOPLE_EVENTS_CITATION_UUID']}": 'citation',
       "udf_#{env['UDF_PEOPLE_EVENTS_NOTES_UUID']}": 'notes'
+    },
+    organizations_people: {
+      "udf_#{env['UDF_ORGANIZATIONS_PEOPLE_RELATIONSHIP_UUID']}": 'relationship',
     }
   }
 
