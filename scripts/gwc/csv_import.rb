@@ -63,7 +63,7 @@ def parse_gwc
   # expects witnesses.csv, manuscripts.csv, and gpc.csv in input/gwc
   input = File.expand_path('input/gwc')
   output = File.expand_path('output/gwc')
-  env = Dotenv.parse './scripts/gwc/.env.staging'
+  env = Dotenv.parse './scripts/gwc/.env.production'
 
   items = []
   events = []
