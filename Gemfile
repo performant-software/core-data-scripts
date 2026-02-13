@@ -1,6 +1,7 @@
 source 'https://rubygems.org'
 
 gem 'activesupport', '~> 7.1.2'
+gem 'aws-sdk-s3', '~> 1.209.0'
 gem 'dotenv', '~> 2.8.1'
 gem 'optparse', '~> 0.4.0'
 gem 'pg', '~> 1.5.4'
