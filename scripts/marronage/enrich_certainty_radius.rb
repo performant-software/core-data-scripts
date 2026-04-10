@@ -135,7 +135,16 @@ module MarronageCertaintyRadius
             "Headers: #{headers.inspect}"
     end
 
-    headers << 'properties' unless headers.include?('properties')
+    # Place `properties` immediately after `longitude` to match the import
+    # service's expected column order (project_model_id, uuid, name, latitude,
+    # longitude, properties, [UDF columns...]).
+    headers.delete('properties')
+    lon_idx = headers.index('longitude')
+    if lon_idx
+      headers.insert(lon_idx + 1, 'properties')
+    else
+      headers << 'properties'
+    end
 
     matched = 0
     unmatched = []
