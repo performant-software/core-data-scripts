@@ -4,6 +4,7 @@ require 'securerandom'
 require 'fileutils'
 require 'dotenv'
 require_relative '../../core/csv/plain_csv_ingester'
+require_relative 'enrich_certainty_radius'
 
 env = Dotenv.parse(File.expand_path("./.env.#{ARGV[0] || 'development'}", __dir__))
 
@@ -453,6 +454,14 @@ end
 
 # Combine Place models: settlements + colonial_landscape + countries + states_provinces → places.csv
 combine_csvs(output, %w[settlements colonial_landscape countries states_provinces], 'places')
+
+# Enrich places.csv with a `properties` column carrying { certainty_radius: X }
+# derived from activity-site circle polygons for settlements.
+MarronageCertaintyRadius.enrich(
+  places_path: File.join(output, 'places.csv'),
+  geojson_path: File.join(input, 'activity_site_polygons_events_04.geojson'),
+  env: env
+)
 
 # Combine Taxonomy models → taxonomies.csv
 combine_csvs(output, %w[group_types event_types location_accuracy landscape_types], 'taxonomies')
