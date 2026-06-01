@@ -134,12 +134,18 @@ def prepare_places(input, intermediate)
   puts "Wrote intermediate/places.csv (#{by_id.size} places, #{place_types.size} place types)"
 end
 
-# --- 2. Tablets (+ Museums, Writing Classifications) -----------------------
+# --- 2. Tablets (+ Writing Classifications) --------------------------------
+# Prefers tablets_with_relations.csv (the Phase-B export carrying place/divine/
+# cultic cross-references). It repeats the singular tablet columns 0-22 with the
+# SAME header names, so Ruby CSV's row['<name>'] returns the first (tablet)
+# occurrence — exactly the singular fields. The trailing cross-ref triples
+# (duplicate 'Object ID'/'Name' headers) are read positionally in the
+# relationship step, not here. Falls back to the singular-only tablets.csv.
 def prepare_tablets(input, intermediate)
-  src = File.join(input, 'tablets.csv')
-  raise "tablets.csv not found in #{input}" unless File.exist?(src)
+  src = ['tablets_with_relations.csv', 'tablets.csv'].map { |n| File.join(input, n) }.find { |p| File.exist?(p) }
+  raise "no tablets export found in #{input}" unless src
+  puts "  (tablets source: #{File.basename(src)})"
 
-  museums = {}          # museum_object_id => name
   writing_values = []
   by_id = collapse(src, alt_col: 'Museum Collection') # the dup-row source here is Museum Collection
 
@@ -152,7 +158,6 @@ def prepare_tablets(input, intermediate)
       row = rec[:row]
       museum_oid = row['Museum - Object ID']&.strip
       museum_name = row['Museum']&.strip
-      museums[museum_oid] = museum_name if museum_oid && !museum_oid.empty? && museum_name && !museum_name.empty?
 
       writing = row['Writing']&.strip
       add_unique(writing_values, writing)
@@ -175,13 +180,38 @@ def prepare_tablets(input, intermediate)
     end
   end
 
-  # Museums (Organizations) — keyed by museum object id
-  CSV.open(File.join(intermediate, 'museums.csv'), 'w', headers: %w[id name url nodegoat_id], write_headers: true) do |csv|
-    museums.each { |moid, name| csv << [moid, name, nil, moid] }
+  write_taxonomy(intermediate, 'writing_classifications', writing_values)
+  puts "Wrote intermediate/tablets.csv (#{by_id.size} tablets), #{writing_values.size} writing classes"
+end
+
+# --- 2b. Museums (Organizations) -------------------------------------------
+# Prefers museums_with_tablets.csv, which carries the museum URL (cols: museum
+# nodegoat ID, Object ID, Name, source×3, Name, URL, then a tablet triple).
+# One row per museum↔tablet pair, so dedup by museum Object ID. Falls back to
+# extracting name-only museums from the tablets export.
+def prepare_museums(input, intermediate)
+  src = File.join(input, 'museums_with_tablets.csv')
+  museums = {} # object_id => { name:, url: }
+  if File.exist?(src)
+    CSV.foreach(src, headers: true, encoding: 'bom|utf-8') do |row|
+      oid = row[1]&.strip                       # museum Object ID (first 'Object ID' col)
+      next if oid.nil? || oid.empty?
+      museums[oid] ||= { name: row[2]&.strip, url: row['URL']&.strip }
+    end
+  else
+    # Fallback: derive from the tablets export (name only).
+    tsrc = ['tablets_with_relations.csv', 'tablets.csv'].map { |n| File.join(input, n) }.find { |p| File.exist?(p) }
+    CSV.foreach(tsrc, headers: true, encoding: 'bom|utf-8') do |row|
+      oid = row['Museum - Object ID']&.strip
+      next if oid.nil? || oid.empty?
+      museums[oid] ||= { name: row['Museum']&.strip, url: nil }
+    end
   end
 
-  write_taxonomy(intermediate, 'writing_classifications', writing_values)
-  puts "Wrote intermediate/tablets.csv (#{by_id.size} tablets), museums.csv (#{museums.size}), #{writing_values.size} writing classes"
+  CSV.open(File.join(intermediate, 'museums.csv'), 'w', headers: %w[id name url nodegoat_id], write_headers: true) do |csv|
+    museums.each { |oid, m| csv << [oid, m[:name], m[:url], oid] }
+  end
+  puts "Wrote intermediate/museums.csv (#{museums.size} museums, #{museums.count { |_, m| m[:url] && !m[:url].empty? }} with URL)"
 end
 
 # --- 3. Cultic Actors ------------------------------------------------------
@@ -239,6 +269,7 @@ end
 genders = []
 prepare_places(input, intermediate)
 prepare_tablets(input, intermediate)
+prepare_museums(input, intermediate)
 prepare_cultic_actors(input, intermediate, genders)
 prepare_divine_characters(input, intermediate, genders)
 write_taxonomy(intermediate, 'genders', genders)
@@ -455,6 +486,41 @@ CSV.foreach(File.join(intermediate, 'divine_characters.csv'), headers: true) do 
   rel(rels, counts, :divine_capacity, env['REL_DIVINE_CAPACITY'], d_uuid, PERSON, capacities_map[row['capacity']&.strip], TAX)
   alt_for = row['alt_name_for_object_id']&.strip
   rel(rels, counts, :alt_name_for, env['REL_DIVINE_ALT_NAME_FOR'], d_uuid, PERSON, divine_map[alt_for], PERSON) if alt_for && !alt_for.empty?
+end
+
+# Tablet cross-references: Places / Divine Characters / Cultic Actors "mentioned".
+# Source: tablets_with_relations.csv. nodegoat emits a CARTESIAN PRODUCT when all
+# three cross-ref fields are exported together, so we project the column triples
+# and DEDUPE to distinct (tablet, related) pairs before emitting relationships.
+# Columns (32-col layout): tablet Object ID = 1; place = 24; divine = 27; cultic = 30.
+# (Going forward Rocío will export one cross-ref per file, which would replace this
+#  block with three small per-relation readers — same pair-sets, no dedup needed.)
+rel_src = File.join(input, 'tablets_with_relations.csv')
+if File.exist?(rel_src)
+  seen = { place: {}, divine: {}, cultic: {} } # use hashes as ordered sets
+  CSV.foreach(rel_src, headers: true, encoding: 'bom|utf-8') do |row|
+    t = row[1]&.strip
+    next if t.nil? || t.empty?
+    { place: 24, divine: 27, cultic: 30 }.each do |k, idx|
+      v = row[idx]&.strip
+      seen[k]["#{t}\t#{v}"] = true if v && !v.empty?
+    end
+  end
+  pair = ->(k) { seen[k].keys.map { |s| s.split("\t", 2) } }
+  unmatched = Hash.new(0)
+  pair.(:place).each do |t, p|
+    tu = tablets_map[t]; ru = places_map[p]
+    ru ? rel(rels, counts, :places_mentioned, env['REL_TABLET_PLACES_MENTIONED'], tu, ITEM, ru, PLACE) : unmatched[:place] += 1
+  end
+  pair.(:divine).each do |t, d|
+    tu = tablets_map[t]; ru = divine_map[d]
+    ru ? rel(rels, counts, :divine_mentioned, env['REL_TABLET_DIVINE_MENTIONED'], tu, ITEM, ru, PERSON) : unmatched[:divine] += 1
+  end
+  pair.(:cultic).each do |t, c|
+    tu = tablets_map[t]; ru = cultic_map[c]
+    ru ? rel(rels, counts, :cultic_mentioned, env['REL_TABLET_CULTIC_MENTIONED'], tu, ITEM, ru, PERSON) : unmatched[:cultic] += 1
+  end
+  puts "  cross-ref unmatched (related record not yet imported): #{unmatched.map { |k, v| "#{k}=#{v}" }.join(' ')}" unless unmatched.empty?
 end
 
 headers = %w[project_model_relationship_id uuid primary_record_uuid primary_record_type related_record_uuid related_record_type]
