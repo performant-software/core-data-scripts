@@ -24,7 +24,11 @@ require 'json'
 require 'uri'
 
 BASE_URL = 'https://staging.coredata.cloud'
-BYPASS_HEADER = { 'access-control-expose-headers' => 'x-trigger-jwt' }
+# Staging runs Clerk (VITE_AUTH_PROVIDER=clerk). Non-browser clients must send
+# User-Agent: node (or Server: Netlify) so the connector's is_clerk? returns
+# false and routes to JWT/password auth instead of expecting a Clerk session
+# cookie. Required on EVERY request, including /auth/login.
+BYPASS_HEADER = { 'User-Agent' => 'node' }
 
 PROJECT_NAME = 'RelNet'
 PROJECT_DESCRIPTION = 'Religious networks and sacred itineraries in late-1st-millennium-BCE Babylonia (University of Barcelona, PI Rocío Da Riva). Migrated from nodegoat.'

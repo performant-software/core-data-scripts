@@ -277,16 +277,25 @@ fields = {
   },
   museums: {
     'name': 'name',
+    'description': '_empty', # native column required by importer COPY order (Organization: name, description)
     udf.('UDF_MUSEUMS_URL') => 'url',
     udf.('UDF_MUSEUMS_NODEGOAT_ID') => 'nodegoat_id'
   },
   cultic_actors: {
+    # Native Person columns in the importer's COPY order: last_name, first_name, middle_name, biography.
+    # Ancient names aren't first/last, so the whole name goes in last_name; the rest are present-but-empty.
     'last_name': 'last_name',
+    'first_name': '_empty',
+    'middle_name': '_empty',
+    'biography': '_empty',
     udf.('UDF_CULTIC_ALT_NAMES') => 'alt_names',
     udf.('UDF_CULTIC_NODEGOAT_ID') => 'nodegoat_id'
   },
   divine_characters: {
     'last_name': 'last_name',
+    'first_name': '_empty',
+    'middle_name': '_empty',
+    'biography': '_empty',
     udf.('UDF_DIVINE_ALT_NAMES') => 'alt_names',
     udf.('UDF_DIVINE_FUNCTION') => 'function',
     udf.('UDF_DIVINE_NODEGOAT_ID') => 'nodegoat_id'
@@ -340,13 +349,20 @@ combine_csvs(output, %w[place_types writing_classifications genders divine_capac
 FileUtils.mv(File.join(output, 'tablets.csv'), File.join(output, 'items.csv')) if File.exist?(File.join(output, 'tablets.csv'))
 FileUtils.mv(File.join(output, 'museums.csv'), File.join(output, 'organizations.csv')) if File.exist?(File.join(output, 'museums.csv'))
 
-# Place uncertainty: add `properties` { certainty_radius } in km (meters/1000),
-# from an optional data/relnet/input/certainty_radius.csv override file.
-RelnetCertaintyRadius.enrich(
-  places_path: File.join(output, 'places.csv'),
-  overrides_path: File.join(input, 'certainty_radius.csv'),
-  env: env
-)
+# Place uncertainty: add `properties` { certainty_radius } in km (meters/1000).
+# DISABLED for staging: the connector version on staging.coredata.cloud does NOT
+# support a Places `properties` column (added in core-data-connector PR #197 but
+# not yet deployed to staging). Including the column breaks the COPY column count.
+# Re-enable once staging is updated; the scaffold + override mechanism are ready.
+if ENV['RELNET_ENABLE_PROPERTIES'] == '1'
+  RelnetCertaintyRadius.enrich(
+    places_path: File.join(output, 'places.csv'),
+    overrides_path: File.join(input, 'certainty_radius.csv'),
+    env: env
+  )
+else
+  puts "Skipping certainty_radius enrichment (staging connector lacks `properties` support)."
+end
 
 puts "\nTransform complete. FairData import files in: #{output}\n\n"
 
