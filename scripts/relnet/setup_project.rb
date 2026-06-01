@@ -19,74 +19,31 @@
 # UDFs. This is the recommended design pending final confirmation with the
 # client; flip individual categories to Select UDFs here if that changes.
 
-require 'net/http'
-require 'json'
-require 'uri'
+require_relative '../../core/fairdata_api'
 
+# Staging/prod run Clerk; FairDataApi::Client sends the `User-Agent: node`
+# bypass on every request so auth routes to JWT/password.
 BASE_URL = 'https://staging.coredata.cloud'
-# Staging runs Clerk (VITE_AUTH_PROVIDER=clerk). Non-browser clients must send
-# User-Agent: node (or Server: Netlify) so the connector's is_clerk? returns
-# false and routes to JWT/password auth instead of expecting a Clerk session
-# cookie. Required on EVERY request, including /auth/login.
-BYPASS_HEADER = { 'User-Agent' => 'node' }
 
 PROJECT_NAME = 'RelNet'
 PROJECT_DESCRIPTION = 'Religious networks and sacred itineraries in late-1st-millennium-BCE Babylonia (University of Barcelona, PI Rocío Da Riva). Migrated from nodegoat.'
 
-# --- HTTP helpers ---
+# --- HTTP + UDF helpers (delegate to the shared core/fairdata_api.rb) ---
 
-def api(method, path, token, body = nil)
-  uri = URI("#{BASE_URL}#{path}")
-  http = Net::HTTP.new(uri.host, uri.port)
-  http.use_ssl = true
-
-  req = case method
-        when :get    then Net::HTTP::Get.new(uri)
-        when :post   then Net::HTTP::Post.new(uri)
-        when :put    then Net::HTTP::Put.new(uri)
-        when :patch  then Net::HTTP::Patch.new(uri)
-        when :delete then Net::HTTP::Delete.new(uri)
-        end
-
-  req['Authorization'] = "Bearer #{token}"
-  req['Content-Type'] = 'application/json'
-  req['Accept'] = 'application/json'
-  BYPASS_HEADER.each { |k, v| req[k] = v }
-
-  req.body = body.to_json if body
-
-  res = http.request(req)
-  unless res.code.to_i.between?(200, 299)
-    raise "API #{method.upcase} #{path} returned #{res.code}: #{res.body&.slice(0, 500)}"
-  end
-
-  JSON.parse(res.body) rescue {}
-end
+CLIENT = FairDataApi::Client.new(BASE_URL)
 
 def login(email, password)
-  uri = URI("#{BASE_URL}/auth/login")
-  http = Net::HTTP.new(uri.host, uri.port)
-  http.use_ssl = true
-
-  req = Net::HTTP::Post.new(uri)
-  req['Content-Type'] = 'application/json'
-  BYPASS_HEADER.each { |k, v| req[k] = v }
-  req.body = { email: email, password: password }.to_json
-
-  res = http.request(req)
-  raise "Login failed (#{res.code}): #{res.body}" unless res.code == '200'
-
-  JSON.parse(res.body)['token']
+  CLIENT.login(email, password)
 end
 
-# The API doesn't return UDF labels — match by order (which we control at creation).
+# `_token` is ignored — CLIENT holds the JWT after login. Call sites are
+# unchanged: api(:get, path, token) / api(:post, path, token, body) / etc.
+def api(method, path, _token = nil, body = nil)
+  body ? CLIENT.public_send(method, path, body) : CLIENT.public_send(method, path)
+end
+
 def map_udfs_by_order(udf_defs, api_udfs)
-  sorted = api_udfs.sort_by { |u| u['order'].to_i }
-  udf_map = {}
-  udf_defs.each_with_index do |udf_def, i|
-    udf_map[udf_def[:env]] = sorted[i]['uuid'] if sorted[i]
-  end
-  udf_map
+  FairDataApi.map_udfs_by_order(udf_defs, api_udfs)
 end
 
 # --- Model definitions ---

@@ -21,6 +21,7 @@ require 'securerandom'
 require 'fileutils'
 require 'dotenv'
 require_relative '../../core/csv/plain_csv_ingester'
+require_relative '../../core/geo'
 require_relative 'enrich_certainty_radius'
 
 env = Dotenv.parse(File.expand_path("./.env.#{ARGV[0] || 'staging'}", __dir__))
@@ -35,47 +36,8 @@ PLEIADES_PREFIX = %r{\Ahttps?://pleiades\.stoa\.org/places/}.freeze
 
 # --- helpers ---------------------------------------------------------------
 
-# Parse a nodegoat [Location] Geometry GeoJSON string into [latitude, longitude].
-# nodegoat exports coordinates in GeoJSON order [lon, lat] — we SWAP to lat/lon.
-# Point -> its coordinates; Polygon / GeometryCollection -> centroid of vertices.
-def parse_geometry(geojson)
-  return [nil, nil] if geojson.nil? || geojson.strip.empty?
-
-  geo = JSON.parse(geojson)
-  case geo['type']
-  when 'Point'
-    lon, lat = geo['coordinates']
-    [lat, lon]
-  when 'Polygon'
-    centroid(geo.dig('coordinates', 0))
-  when 'GeometryCollection'
-    # Ziggurat of Babylon is the lone GeometryCollection — average all member centroids.
-    pts = (geo['geometries'] || []).flat_map { |g| flatten_coords(g) }
-    centroid(pts)
-  else
-    [nil, nil]
-  end
-rescue JSON::ParserError
-  warn "  ! could not parse geometry: #{geojson.to_s.slice(0, 60)}"
-  [nil, nil]
-end
-
-def flatten_coords(geom)
-  case geom['type']
-  when 'Point'   then [geom['coordinates']]
-  when 'Polygon' then geom.dig('coordinates', 0) || []
-  else []
-  end
-end
-
-# centroid of [[lon, lat], ...] -> [lat, lon]
-def centroid(ring)
-  return [nil, nil] if ring.nil? || ring.empty?
-  verts = ring.last == ring.first ? ring[0..-2] : ring
-  lon = verts.map { |p| p[0].to_f }.sum / verts.length
-  lat = verts.map { |p| p[1].to_f }.sum / verts.length
-  [lat.round(6), lon.round(6)]
-end
+# Geometry parsing (GeoJSON [lon,lat] -> [lat,lon]; Point/Polygon/GeometryCollection)
+# lives in core/geo.rb — use Geo.parse_point.
 
 def normalize_pleiades(val)
   return nil if val.nil? || val.strip.empty?
@@ -114,7 +76,7 @@ def prepare_places(input, intermediate)
   CSV.open(File.join(intermediate, 'places.csv'), 'w', headers: cols, write_headers: true) do |csv|
     by_id.each do |oid, rec|
       row = rec[:row]
-      lat, lon = parse_geometry(row['[Location] Geometry'])
+      lat, lon = Geo.parse_point(row['[Location] Geometry'])
       kind = row['Kind of Place']&.strip
       add_unique(place_types, kind)
       csv << [
