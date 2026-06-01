@@ -1,2 +1,7 @@
+# Client/project data — kept local, never committed
+data/
 output/*
 input/*
+
+# Claude Code session artifacts
+.claude/
